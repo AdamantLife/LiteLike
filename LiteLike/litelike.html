@@ -1,5 +1,15 @@
 <!DOCTYPE html>
 <html>
     <head></head>
-    <body></body>
+    <body>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+        <script type="module" src="scripts/game.js"></script>
+        <script>
+            window.onload = ()=>{
+            console.log(GAME.random());
+            console.log(JSON.stringify(GAME.random.state()));
+            console.log(GAME.random());
+            }
+        </script>
+    </body>
 </html>
