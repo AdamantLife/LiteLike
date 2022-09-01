@@ -40,13 +40,35 @@ class Character extends Entity{
      *                             Character is automatically added.
      * @param {Object} statistics - An object containing combat statistics.
      * @param {Number} statistics.hp - An integer representing the Character's max hp
-     * @param {Number} statistics.currenthp - An integer representing the Character's current hp
-     * @param {Weapon[]} weapons - An Array of Weapon Objects available for the character
+     * @param {Number} statistics.currentHP - An integer representing the Character's current hp
+     * @param {Object}   equipment - An object containing equipment for the character
+     * @param {Weapon[]} equipment.weapons - An Array of Weapon Objects available for the character
+     * @param {Armor}    equipment.armor - An Armor object
+     * @param {Item[]}   equipment.items - An Array of Item Objects owned by the character
      */
-    constructor(id, roles, statistics, weapons){
-        this.statistics = statistics;
-        this.weapons = Array.from(weapons);
+    constructor(id, roles, statistics, equipment){
+        // It's arguably more future-proof not to individually pull out statistics
+        // and just to copy whole the object over
+        this.statistics = Object.assign({}, statistics);
+
+        let weapons = [];
+        // If there are weapons in equipment, copy the array over
+        if(equipment.hasOwnProperty("weapons")) weapons = Array.from(equipment.weapons);
+        this.weapons = weapons;
+
+        let armor = null;
+        // If there is armor, set the Character's armor to that armor
+        if(equipment.hasOwnProperty("armor")) armor = equipment.armor;
+        this.armor = armor;
+
         super(id, roles);
+    }
+
+    /**
+     * Returns whether or not the Character's currentHP is less than or equal to 0
+     */
+    isKOd(){
+        return this.statistics.currentHP <= 0;
     }
 
     /**
@@ -60,7 +82,34 @@ class Character extends Entity{
         if(typeof random == "undefined") random = Math.random;
         return UTILS.randomChoice(this.weapons, random);        
     }
-    
 
+    /**
+     * Calls updateState on all weapons in the Player's inventory
+     */
+    updateWeapons(){
+        for(let weapon of this.weapons){
+            weapon.updateState();
+        }
+    }
+
+    /**
+     * Returns the first weapon that isAvailable or null if no weapons are available
+     * @returns {Weapon | null} - returns the first weapon that isAvailable or null
+     */
+    firstAvailableWeapon(){
+        for(let weapon of this.weapons){
+            if(weapon.isAvailable()) return weapon;
+        }
+    }
+
+    /**
+     * Returns the first weapon that isFireable or null if no weapons are Fireable
+     * @returns {Weapon | null} - returns the first weapon that isFireable or null
+     */
+    firstFireableWeapon(){
+        for(let weapon of this.weapons){
+            if(weapon.isFireable()) return weapon;
+        }
+    }
 }
 

@@ -1,6 +1,8 @@
 /**
  * Converts the provided arguments into a frozen object
  * @returns {Object} - A frozen object of the given arguments 
+ * 
+ * Adapted from: https://stackoverflow.com/q/44447847
  */
 export function enumerate(){
     // Create an object to return
