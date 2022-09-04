@@ -15,7 +15,7 @@ function heal(target, value){
     return (activator, opponent)=>{
         let chara = activator;
         if(target == "OPPONENT") target = opponent;
-        chara.statistics.hp = Math.min(chara.statistics.hp, chara.statistics.currentHP + value);
+        chara.statistics.currentHP = Math.min(chara.statistics.hp, chara.statistics.currentHP + value);
     }
 }
 

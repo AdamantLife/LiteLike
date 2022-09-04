@@ -47,6 +47,8 @@ export class Character extends Entity{
      * @param {Item[]}   equipment.items - An Array of Item Objects owned by the character
      */
     constructor(id, roles, statistics, equipment){
+        super(id, roles);
+
         // It's arguably more future-proof not to individually pull out statistics
         // and just to copy whole the object over
         this.statistics = Object.assign({}, statistics);
@@ -61,7 +63,10 @@ export class Character extends Entity{
         if(equipment.hasOwnProperty("armor")) armor = equipment.armor;
         this.armor = armor;
 
-        super(id, roles);
+        let items = [];
+        // If there are items in equipment, copy the array over
+        if(equipment.hasOwnProperty("items")) items = Array.from(equipment.items);
+        this.items = items;
     }
 
     /**

@@ -1,8 +1,22 @@
 {
+    "character":[
+        {
+            "name":"Player Character",
+            "flavor": "You. In a Mech. IN SPACE!!!"
+        },
+        {
+            "name": "Space Brigand",
+            "flavor": "Just like the terrestial type, just IN SPACE!!!"
+        }
+    ],
     "weapon":[
         {
             "name": "Battle Ax",
-            "flavor": "A classic emblematic of destructive force."
+            "flavor": "A classic weapon emblematic of destructive force."
+        },
+        {
+            "name": "Kinetic Rifle",
+            "flavor": "In an age of lasers and rockets, making something really hard go really fast can still cause a lot of Trauma"
         }
     ],
     "armor":[
