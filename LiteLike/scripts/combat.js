@@ -2,6 +2,8 @@
 
 import * as UTILS from "./utils.js";
 
+const LOOPRATE = 1000 / 16; // 1 second in ms, at 16fps
+
 /**
  * Description of a combat callback
  * DEVNOTE- Since we're emulating A Dark Room, we're only concerned with 1v1
@@ -18,10 +20,14 @@ const actiontypes = UTILS.enumerate(["WEAPON","ITEM"])
 class PlayerAction{
     /**
      * 
+     * @param {Character} activator - The character taking the action
      * @param {Symbol} actiontype - an actiontype
      * @param {Weapon | Item} object - the item or weapon being used
+     * @param {Character} opponent - The character's opponent
      */
-    constructor(actiontype, object){
+    constructor(activator, actiontype, object, opponent){
+        this.activator = activator;
+        this.opponent = opponent;
         this.actiontype = actiontype;
         this.object = object;
     }
@@ -41,26 +47,27 @@ class Combat{
         this.player = player;
         this.enemy = enemy;
         this.victor = null;
+        this.playerQueue = [];
+        this.playerDistance = weaponranges.RANGED;
+        this.enemyDistance = weaponranges.RANGED;
     }
+
     /**
-     * A cycle in the Combat Loop
-     * @param {PlayerAction[]} playercommands - An array of PlayerActions to execute
+     * Handles the combat loop, which involves placing player actions
+     * and enemy actions on the stack and resolving them while checking
+     * for combat to end
      */
-    combatStack(playercommands){
+    combatLoop(){
+        // If combat is over, resolve combat and return
+        if(this.victor !== null) return this.resolveCombat();
+        
+        let playerCommands = [], enemeyActions = [];
 
-        // Handle all player commands since last cycle
-        for(let action of playercommands){
-            if(action.actiontype === actiontypes.WEAPON) this.handleWeapon(action.object, this.player, this.enemy);
-            else if(action.actiontype === actiontypes.ITEM) this.handleItem(action.object);
+        playerCommands = [...this.playerQueue];
 
-            // Update character states and exits the combatStack if the
-            // combat is over
-            /** DEVNOTE - Immediately exiting here has implications if we add DOT
-             *              to the game and don't handle it before this point
-             */
-            if(this.handleKO()) return;
-
-        }
+        // Clear playerQueue
+        this.playerQueue = [];
+        
         // Since we're modeling off of A Dark Room, the Enemey AI just spams
         // attack afaik. For more sophisticated gameplay we would implement an
         // actual AI
@@ -69,11 +76,33 @@ class Combat{
         // If no weapon is immediately fireable, use the first available one instead
         weapon = weapon ? weapon : this.enemy.firstAvailableWeapon();
         // If the AI has a weapon it can use, use it
-        if(weapon) this.handleWeapon(weapon, this.enemy, this.player)
+        if(weapon) enemeyActions.push(
+            PlayerAction(this.enemy, actiontypes.WEAPON, weapon, this.player)
+            );
 
-        //Se above notes
-        if(this.handleKO()) return;
-        
+        this.combatStack(playerCommands, enemeyActions);
+        window.setTimeout(this.combatLoop, LOOPRATE);
+    }
+
+    /**
+     * A cycle in the Combat Loop
+     * @param {PlayerAction[]} playerCommands - An array of PlayerActions to execute
+     */
+    combatStack(playerCommands, enemyActions){
+
+        // Handle all player commands and enemy actions
+        for(let action of [...playerCommands, ...enemyActions]){
+            if(action.actiontype === actiontypes.WEAPON) this.handleWeapon(action);
+            else if(action.actiontype === actiontypes.ITEM) this.handleItem(action);
+
+            // Update character states and exits the combatStack if the
+            // combat is over
+            /** DEVNOTE - Immediately exiting here has implications if we add DOT
+             *              to the game and don't handle it before this point
+             */
+            if(this.handleKO()) return;
+
+        }        
         // Update the state of all weapons
         // Putting this after all other handleKO()s because weapons don't matter
         // if combat is over
@@ -83,11 +112,10 @@ class Combat{
 
     /**
      * Uses the given weapon to deal damage to the target
-     * @param {Weapon} weapon - The weapon instance being used
-     * @param {Character} activator - The Character weilding the weapon
-     * @param {Character} target - The Characte being targeted by the weapon
+     * @param {PlayerAction} action - The WEAPON PlayerAction to resolve
      */
-    handleWeapon(weapon, activator, target){
+    handleWeapon(action){
+        let weapon = action.object;
         if(!weapon.isFireable()){
             // As usual, we should raise an error, but since we're being as simple as
             // possible, we'll just ignore the action
@@ -100,7 +128,7 @@ class Combat{
         }
         // Weapon is fireable, so deal damage
         // Damage right now is weapondamage - armor, minimum of 1 damage
-        target.statistics.currentHP -= max(weapon.weapontype.damage - target.armor.value, 1);
+        action.opponent.statistics.currentHP -= Math.max(weapon.weapontype.damage - action.opponent.armor.value, 1);
 
         // Have weapon set itself as fired
         // We're allowing weapon to handle this itself incase using a weapon becomes
@@ -110,12 +138,11 @@ class Combat{
 
     /**
      * Call an itemtype's callback
-     * @param {Item} item - The item being used
-     * @param {Character} activator - The character using the item
-     * @param {Character} opponent - The opposing character
+     * @param {PlayerAction} action - The Item PlayerAction to resolve
      */
-    handleItem(item, activator, opponent){
-        item.itemtype.callback(activator, opponent);
+    handleItem(action){
+        let item = action.object
+        item.itemtype.callback(action.activator, action.opponent);
         // Similar to weapons, we're letting item do whatever it needs to do
         // in response to being used (instead of e.g.- removing a consumable)
         // item from the character

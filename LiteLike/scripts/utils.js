@@ -70,3 +70,12 @@ export function now(){
     */
     return NOW();
 }
+
+/**
+ * 
+ * @param {Prototype} cls - The class to create a new instance of
+ * @param {Object} jsn - The json to be assigned to the class
+ */
+export function instanceFromJSON(cls, jsn){
+    return Object.assign(Object.create(cls.prototype), jsn);
+}

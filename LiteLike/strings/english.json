@@ -1,0 +1,20 @@
+{
+    "weapon":[
+        {
+            "name": "Battle Ax",
+            "flavor": "A classic emblematic of destructive force."
+        }
+    ],
+    "armor":[
+        {
+            "name": "Basic Armor",
+            "flavor": "The minimum armor required to survive interstellar radiation"
+        }
+    ],
+    "item":[
+        {
+            "name": "Repair Bot",
+            "flavor": "A modest, battery-powered robot which repairs your mech"
+        }
+    ]
+}

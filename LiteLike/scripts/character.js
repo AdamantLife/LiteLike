@@ -2,7 +2,7 @@
 
 import * as UTILS from "./utils.js";
 
-const roles = UTILS.enumerate("PLAYER", "ENEMY", "CHARACTER", "ITEM");
+export const roles = UTILS.enumerate("PLAYER", "ENEMY", "CHARACTER", "ITEM");
 
 /**
  * An individual entity within the game
@@ -32,7 +32,7 @@ class Entity{
  * A sublcass of Entity which automatically adds the Charater role,
  * and comes with combat statistics
  */
-class Character extends Entity{
+export class Character extends Entity{
     /**
      * 
      * @param {Number} id - The enumerated id of this specific Entity

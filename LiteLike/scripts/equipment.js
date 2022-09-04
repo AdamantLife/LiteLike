@@ -2,6 +2,9 @@
 
 import * as UTILS from "./utils.js";
 
+// Weapon Ranges
+const weaponranges = UTILS.enumerate("MELEE", "RANGED");
+
 // State of the weapon based on Warmup and Cooldown
 const weaponstates = UTILS.enumerate(
     "CHARGING", // The weapon is warming up
@@ -13,28 +16,30 @@ const weaponstates = UTILS.enumerate(
 /**
  * A class for describing attack options
  */
-class WeaponType{
+export class WeaponType{
     /**
      * 
      * @param {Number} id - An integer
      * @param {Number} damage - An integer amount of damage the weapon deals
      * @param {Number} cooldown - A float representing the amount of time the interval
-     *                              required between uses
-     * @param {*} warmup - A float representing how long a weapon takes to inflict damage
+     *                              required between uses in ms
+     * @param {Number} warmup - A float representing how long a weapon takes to inflict damage
      *                      after it has been activated
+     * @param {Symbol} range - The range of the weapon from weaponranges
      */
-    constructor(id, damage, cooldown, warmup){
+    constructor(id, damage, cooldown, warmup, range){
         this.id = id;
         this.damage = damage;
         this.cooldown = cooldown;
         this.warmup = warmup;
+        this.range = range;
     }
 }
 
 /**
  * A specific instance of a WeaponType
  */
-class Weapon {
+export class Weapon {
     /**
      * 
      * @param {WeaponType} weapontype - This weapon's WeaponType, which determines its base statistics
@@ -141,7 +146,7 @@ class Weapon {
  * if this changes in the future we can split armor into ArmorType/Armor
  * like with Weapons
  */
- class Armor {
+export class Armor {
 
     /**
      * @param {Number} id - an unique integer
@@ -160,7 +165,7 @@ const targets = UTILS.enumerate("SELF", "ENEMY");
 /**
  * Base class for Items
  */
-class ItemType{
+export class ItemType{
 
     /**
      * DEVNOTE- In a more-complex game isConsumable would be "maxUses", but A Dark Room
@@ -188,7 +193,7 @@ class ItemType{
 /**
  * The instance-class of an ItemType
  */
-class Item{
+export class Item{
     /**
      * 
      * @param {ItemType} itemtype - The itemtype this item instance represents

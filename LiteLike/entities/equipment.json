@@ -1,0 +1,30 @@
+{
+    "weapon":[
+        { 
+            "damage": 1,
+            "cooldown": 1000,
+            "warmup": null,
+            "range": 0
+        },
+        { 
+            "damage": 2,
+            "cooldown": 2000,
+            "warmup": null,
+            "range": 1
+        }
+    ],
+    "armor":[
+        {
+            "value": 0
+        }
+    ],
+    "item":[
+        {
+            "target": 0,
+            "callback":"HEAL",
+            "arguments":["ACTIVATOR",45],
+            "isConsumable":true,
+            "cooldown":1000
+        }
+    ]
+}

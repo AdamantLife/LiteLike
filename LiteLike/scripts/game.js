@@ -1,18 +1,50 @@
 "use strict";
 
-import * as CHARACTER from "./character.js";
+import {Character, roles} from "./character.js";
+
 import * as MAP from "./map.js";
 import * as EVENTS from "./events.js";
+import * as IO from "./io.js";
 
 
 export class Game{
     constructor(state){
         if(typeof state !== "undefined"){
-            console.log("here");
             this.random = new Math.seedrandom("", {state});
         }else{
             this.random = new Math.seedrandom(Math.random(), {state:true});
         }
+        this.LANGUAGE = "english";
+        this.STRINGS = null;
+        IO.loadStrings(this.LANGUAGE);
+        this.EQUIPMENT = null;
+        IO.loadEquipment()
+            .then(result=>{this.EQUIPMENT = result;})
+            .catch(error=> console.log(error));
+        this.PLAYER = null;
+        this.MAP = null;
+        this.COMBAT = null;
+    }
+
+    /**
+     * Runs a demo
+     */
+    runDemo(){
+        let fightbox = document.getElementById("fightBox");
+        this.PLAYER = this.startingCharacter();
+        // TODO: Display Player stats
+        // TODO: Make Enemey Character
+        // TODO: Do Combat
+    }
+
+    /**
+     * Returns a starting player character
+     */
+    startingCharacter(){
+        return Character(0, [roles.CHARACTER, roles.PLAYER],
+            {hp:5, currentHP: 5},
+            {weapons: [this.EQUIPMENT.weapons[0]],
+                armor:this.EQUIPMENT.armor[0]})
     }
 }
 
