@@ -85,8 +85,6 @@ export function loadStrings(language){
  */
 export function getStrings(language, object){
     let id, dict;
-    console.log(language);
-    console.log(object);
     switch(object.constructor.name){
         case "Character":
             id=object.id;

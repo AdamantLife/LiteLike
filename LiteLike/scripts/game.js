@@ -55,9 +55,14 @@ export class Game{
      * Runs a demo
      */
     runDemo(){
+        // Disable button to avoid shenanigans
+        document.getElementById("startGame").disabled = true;
 
         // Get the output space
         let fightbox = document.getElementById("fightBox");
+
+        // Make sure fightbox is clear (if this was run previously)
+        while(fightbox.lastChild) fightbox.lastChild.remove();
 
         // Create a new player Character
         this.PLAYER = this.startingCharacter();
@@ -85,14 +90,14 @@ export class Game{
 
             // Display Character's Statistics
             fightbox.insertAdjacentHTML(`beforeend`,`
-    <table>
+    <table id="player${chara.id}">
         <tbody>
             <tr>
                 <td colspan=2><h1 title="${string.flavor}">${string.name}</h1></td>
             </tr>
             <tr>
                 <td><b>HP:</b></td>
-                <td title="Current HP">${chara.statistics.currentHP} <i title="Max HP">(${this.PLAYER.statistics.hp})</i></td>
+                <td title="Current HP"><span  id="player${chara.id}hp">${chara.statistics.currentHP}</span> <i title="Max HP">(${this.PLAYER.statistics.hp})</i></td>
             </tr>
         </tbody>
     </table>`
@@ -100,20 +105,24 @@ export class Game{
 
             // Getting a reference to the created html table so we can add
             // more Character Information to it
-            let table = fightbox.lastElementChild;
-            let body = table.getElementsByTagName("tbody")[0];
+            let body = document.querySelector(`#player${chara.id}>tbody:first-of-type`);
 
             // Display all the Character's weapons
-            for(let weapon of chara.weapons){
+            // We're using the index so we can reference it later
+            for(let i = 0; i < chara.weapons.length; i++){
+
+                // Get weapon from index
+                let weapon=chara.weapons[i];
 
                 // Use getStrings to get name and flavor text for the current weapon
                 let strings = IO.getStrings(this.STRINGS, weapon);
                 
                 // Display weapon statistics
                 body.insertAdjacentHTML(`beforeend`, `
-    <tr>
+    <tr class="weapon" data-index="${i}">
         <td><b>Weapon</b></td>
         <td><span title="${strings.flavor}">${strings.name}</span></td>
+        <td class="state">Available</td>
     </tr>`
             );
             }
@@ -128,16 +137,22 @@ export class Game{
             );
 
             // Display all the Character's Items
-            for(let item of chara.items){
+            // We're using the index so we can reference it later
+            for(let i = 0; i < chara.items.length; i++){
+
+                // Get actual item
+                let item = chara.items[i];
 
                 // Use getStrings to get name and flavor text for the current item
                 let strings = IO.getStrings(this.STRINGS, item);
                 
                 // Display item statistics
+                // TODO: Once we start doing css, change quantity to a span with font-style
                 body.insertAdjacentHTML(`beforeend`, `
-    <tr>
+    <tr class="item" data-index="${i}">
         <td><b>Item</b></td>
-        <td><span title="${strings.flavor}">${strings.name} <i>(Qty:${item.quantity})</i></span></td>
+        <td><span title="${strings.flavor}">${strings.name} <i class="quantity">(Qty:${item.quantity})</i></span></td>
+        <td class="state"></td>
     </tr>`
                 );
             }
@@ -145,8 +160,14 @@ export class Game{
         }
         /* End outputCharacter*/
 
+        // Output both character's stats
         outputCharacter.bind(this)(this.PLAYER);
         outputCharacter.bind(this)(enemy);
+
+        // Create a log
+        fightbox.insertAdjacentHTML('beforeend',`<ul id="fightlog"></ul>`);
+        // Could get it via document.getElementById #preference
+        let fightlog = fightbox.querySelector("#fightlog");
 
        
         this.COMBAT = new Combat(this.PLAYER, enemy);
@@ -166,7 +187,7 @@ export class Game{
             if(player.statistics.currentHP <= player.statistics.hp / 2 &&
             player.items.length // Player's only item is 1 repair bot in this demo
             ){
-                action = CharacterAction(player, actiontypes.ITEM, player.items[0], event.enemy);
+                action = new CharacterAction(player, actiontypes.ITEM, player.items[0], event.enemy);
             }else{ // Either the Player is not badly injured or it cannot heal anymore
                 // So just attack (if we can)
                 // Copied from enemy AI
@@ -174,11 +195,20 @@ export class Game{
                 // If no weapon is immediately fireable, use the first available one instead
                 weapon = weapon ? weapon : player.firstAvailableWeapon();
                 // If the player has a weapon it can use, use it
-                if(weapon) action = CharacterAction(player, actiontypes.WEAPON, weapon, event.enemy);
+                if(weapon) action = new CharacterAction(player, actiontypes.WEAPON, weapon, event.enemy);
             }
 
             // Stick action on PlayerQueue if we have one
             if (action) event.combat.playerQueue.push(action);
+        }
+
+
+        /**
+         * Utility funciton to output the given string to the fightlog
+         * @param {String} log - What to write to the fightlog
+         */
+        function outputToFightLog(log){
+            fightlog.insertAdjacentHTML('beforeend', `<li class="logitem">${log}</li>`);
         }
 
         /**
@@ -186,7 +216,23 @@ export class Game{
          * @param {Event} event 
          */
         function useWeapon(event){
-            // TODO
+            // Find out who's using the weapon and what it is
+            let charaname = IO.getStrings(this.STRINGS, event.action.activator).name;
+            let weaponname = IO.getStrings(this.STRINGS, event.action.object).name;
+
+            // Check if it is dealing damage
+            // Note that weapons cannot deal 0 damage, so !event.damage
+            // signifies that the weapon is charging
+            if(event.damage){
+                // Get the opponent
+                let opponame = IO.getStrings(this.STRINGS, event.action.opponent).name;
+
+                // Log the Damage
+                outputToFightLog(`${charaname} attacks ${opponame} with ${weaponname} for ${event.damage}`);
+            }else{
+                // Only other option right now is that the weapon started charging
+                outputToFightLog(`${charaname} started charging his ${weaponname}`);
+            }
         }
 
         /**
@@ -194,12 +240,97 @@ export class Game{
          * @param {Event} event 
          */
         function useItem(event){
-            // ToDo
+            // Find out who's using what item
+            let charaname = IO.getStrings(this.STRINGS, event.action.activator).name;
+            let itemname = IO.getStrings(this.STRINGS, event.action.object).name;
+
+            outputToFightLog(`${charaname} activated ${itemname}`);
+
+        }
+
+        /**
+         * Updates the UI to correct all weapon and item states and Character HP
+         * @param {Event} event 
+         */
+        function updateWeaponsItemsHP(event){
+
+            // For each character, update their weapon and item stats
+            for(let chara of [event.combat.player, event.combat.enemy]){
+
+                // The Players stat table
+                let table = document.getElementById(`player${chara.id}`);
+
+                // Update HP
+                table.querySelector(`#player${chara.id}hp`).textContent = chara.statistics.currentHP;
+
+                // Update weapons
+                for(let i = 0; i < chara.weapons.length; i++){
+                    // HTML Table Cell for the weapon state
+                    let stateele = table.querySelector(`tr.weapon[data-index="${i}"]>td.state`);
+                    // Default state is READY
+                    let state = "READY";
+                    // Get the actual weapon
+                    let weapon = chara.weapons[i];
+                    // Check if the weapon is on Cooldown
+                    if(weapon.cooldown !== EQUIP.weaponstates.READY){
+                        state = "ON COOLDOWN";
+                    }else
+                    // Check if the weapon is charging
+                    if(weapon.isCharging()){
+                        state = "CHARGING";
+                    }else
+                    // If warmup is not ready, output the warmup state
+                    // warmup will always be READY for non-charging weapons
+                    if(weapon.warmup != EQUIP.weaponstates.READY){
+                        state = weapon.warmup;
+                    }
+
+                    stateele.textContent = state;
+                }
+
+                // Update Items
+                for(let i = 0; i< chara.items.length; i++){
+                    // Get Item instance
+                    let item = chara.items[i];
+                    // Get the item's output row (as state and quantity will
+                    // both need to be updated)
+                    let row = table.querySelector(`tr.item[data-index="${i}"]`);
+
+                    // Update Quantity
+                    // TODO- once we start actually doing CSS, quantity should
+                    // change to a span and we'll set the font-style to italics there
+                    let quant = row.querySelector("i.quantity");
+                    quant.textContent = item.quantity;
+
+                    // Update State
+                    let state = row.querySelector("td.state");
+                    // Items are a lot easier than Weapons...
+                    state.textContent = item.cooldown ? "On Cooldown" : "Ready";
+                }
+            }
+        }
+
+        /**
+         * Posts the results of combat on the page
+         * @param {Event} event 
+         */
+        function endCombat(event){
+            // Do a final update for the stats
+            updateWeaponsItemsHP(event);
+
+            // Get the victor's name and give them credit
+            let victorname = IO.getStrings(this.STRINGS, event.combat.victor).name;
+            outputToFightLog(`${victorname} is the Victor!`);
+
+            // Re-enable the Run Demo button
+            document.getElementById("startGame").disabled = false;
         }
 
         this.COMBAT.addEventListener("startloop", playerAI.bind(this));
         this.COMBAT.addEventListener("useweapon", useWeapon.bind(this));
         this.COMBAT.addEventListener("useitem", useItem.bind(this));
+        this.COMBAT.addEventListener("endstack", updateWeaponsItemsHP.bind(this));
+        this.COMBAT.addEventListener("endcombat", endCombat.bind(this));
 
         this.COMBAT.combatLoop();
     }

@@ -8,8 +8,8 @@
         },
         { 
             "damage": 2,
-            "cooldown": 2000,
-            "warmup": null,
+            "cooldown": 1000,
+            "warmup": 1000,
             "range": 1
         }
     ],

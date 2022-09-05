@@ -1,6 +1,7 @@
 "use strict";
 
 import * as UTILS from "./utils.js";
+import {weaponranges, weaponstates} from "./equipment.js";
 
 const LOOPRATE = 1000 / 16; // 1 second in ms, at 16fps
 
@@ -15,7 +16,7 @@ const LOOPRATE = 1000 / 16; // 1 second in ms, at 16fps
  * @param {Character} opponent - the enemy of the owner of the effect
  */
 
-export const actiontypes = UTILS.enumerate(["WEAPON","ITEM"])
+export const actiontypes = UTILS.enumerate("WEAPON","ITEM");
 
 export class CharacterAction{
     /**
@@ -38,7 +39,7 @@ export class CharacterAction{
  * A Combat Instance
  */
 export class Combat{
-    static EVENTTYPES = UTILS.enumerate("startloop","endloop","startstack","endstack","useweapon", "useitem");
+    static EVENTTYPES = UTILS.enumerate("startloop","endloop","startstack","endstack","useweapon", "useitem", "endcombat");
 
     /**
      * 
@@ -59,6 +60,7 @@ export class Combat{
         for(let sym of Object.values(Combat.EVENTTYPES)){
             this._listeners[sym] = [];
         }
+
     }
 
     /**
@@ -99,7 +101,7 @@ export class Combat{
         if(this._listeners[eventtype].indexOf(callback) > -1) return;
 
         // Register the callback under its type
-        this._listeners[eventtype].append(callback);
+        this._listeners[eventtype].push(callback);
     }
 
     /**
@@ -133,20 +135,19 @@ export class Combat{
      */
     triggerEvent(eventtype, additional){
         eventtype = this._validateEventType(eventtype);
-        let event = new Event(eventtype,
-            {
-                "combat": this,
-                "player": this.player,
-                "enemy":this.enemy,
-                "time":UTILS.now()
-            }
-        );
+        let event = new Event(eventtype.toString());
+        Object.assign(event, {
+            "combat": this,
+            "player": this.player,
+            "enemy":this.enemy,
+            "time":UTILS.now()
+        });
         // If additional properties were passed, add them
         if(additional && typeof additional !== "undefined"){
-            Event.assign(additional);
+            Object.assign(event,additional);
         }
         for(let listener of this._listeners[eventtype]){
-            result = listener(event);
+            let result = listener(event);
             // TODO: consider cancelling combat via listener
         }
     }
@@ -179,7 +180,7 @@ export class Combat{
         weapon = weapon ? weapon : this.enemy.firstAvailableWeapon();
         // If the AI has a weapon it can use, use it
         if(weapon) enemeyActions.push(
-            CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player)
+            new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player)
             );
 
         this.combatStack(playerCommands, enemeyActions);
@@ -188,7 +189,7 @@ export class Combat{
         this.triggerEvent(Combat.EVENTTYPES.endloop);
 
         // Set next timeout
-        window.setTimeout(this.combatLoop, LOOPRATE);
+        window.setTimeout(this.combatLoop.bind(this), LOOPRATE);
     }
 
     /**
@@ -229,18 +230,34 @@ export class Combat{
     handleWeapon(action){
         let weapon = action.object;
         if(!weapon.isFireable()){
-            // As usual, we should raise an error, but since we're being as simple as
-            // possible, we'll just ignore the action
-            if(!weapon.isAvailable()) return;
-            // If the weapon is a warmup-type, then we will start charging it and exit
-            if(weapon.weapontype.warmup){
+            // If the weapon is a warmup-type, then we will start charging it
+            // if it is ready to be charged
+            if(weapon.weapontype.warmup && weapon.warmup === weaponstates.READY){
                 weapon.warmup = UTILS.now();
+
+                // Notify listeners that the weapon's warmup is being updated
+                this.triggerEvent(Combat.EVENTTYPES.useweapon, {action, result: "warmup", damage: null});
                 return;
             }
+            // If the weapon was not fireable, and cannot start the charging cycle
+            // then it was invalid and in theory we should throw an error, but as
+            // noted elsewhere, we aren't raising errors to keep the game simple
+            return;
         }
+
         // Weapon is fireable, so deal damage
         // Damage right now is weapondamage - armor, minimum of 1 damage
-        action.opponent.statistics.currentHP -= Math.max(weapon.weapontype.damage - action.opponent.armor.value, 1);
+        let damage = Math.max(weapon.weapontype.damage - action.opponent.armor.value, 1);
+
+        // let listeners know the weapon is about to deal damage
+        // As with, triggerEvent in theory we could allow the listeners to modify combat
+        // (which is why we are saving the result) but that is probably outside of the
+        // scope of this game
+        // DEVNOTE- We could/should also implement before/after damage events, but- again- probably uneccesary at the moment
+        let result = this.triggerEvent(Combat.EVENTTYPES.useweapon, {action, result: "damage", damage});
+        
+        // Apply the damage to the opponent
+        action.opponent.statistics.currentHP -= damage;
 
         // Have weapon set itself as fired
         // We're allowing weapon to handle this itself incase using a weapon becomes
@@ -254,11 +271,18 @@ export class Combat{
      */
     handleItem(action){
         let item = action.object
+
+        // Activate the item
         item.itemtype.callback(action.activator, action.opponent);
         // Similar to weapons, we're letting item do whatever it needs to do
         // in response to being used (instead of e.g.- removing a consumable)
         // item from the character
         item.use();
+
+        // Notify listeners that an item has been used
+        // DEVNOTE- As noted in handleWeapon, it would probably be useful to implement
+        // before and after useitem events as well
+        this.triggerEvent(Combat.EVENTTYPES.useitem, {action, item});
     }
 
     /**
@@ -275,5 +299,14 @@ export class Combat{
         else if(this.enemy.isKOd()) this.victor = this.player;
         if(this.victor !== null) return true;
         return false;
+    }
+
+    /**
+     * Cleans up combat
+     */
+    resolveCombat(){
+        // Notify listeners of end of combat
+        this.triggerEvent(Combat.EVENTTYPES.endcombat);
+        //TODO
     }
 }

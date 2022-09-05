@@ -3,10 +3,10 @@
 import * as UTILS from "./utils.js";
 
 // Weapon Ranges
-const weaponranges = UTILS.enumerate("MELEE", "RANGED");
+export const weaponranges = UTILS.enumerate("MELEE", "RANGED");
 
 // State of the weapon based on Warmup and Cooldown
-const weaponstates = UTILS.enumerate(
+export const weaponstates = UTILS.enumerate(
     "CHARGING", // The weapon is warming up
     "CHARGED", // The weapon was previously Charged and now is ready to deal damage
     "FIRED", // The Weapon was previously Ready, Charged, or Charging and now needs its Cooldown updated
@@ -54,8 +54,8 @@ export class Weapon {
      * Returns whether the weapon is available to used
      */
     isAvailable(){
-        // The weapon is not on cooldown
-        return this.cooldown === weaponstates.READY;
+        // The weapon is not on cooldown or charging
+        return this.cooldown === weaponstates.READY && this.warmup === weaponstates.READY;
     }
 
     /**
@@ -69,10 +69,23 @@ export class Weapon {
     }
 
     /**
+     * Returns whether the weapon is currently charging up.
+     * If the weapon is not a chargeable type to begin with, this will always
+     * return false
+     */
+    isCharging(){
+        // Weapon is not chargeable to begin with
+        if(!this.weapontype.warmup) return false;
+        // The weapon is charging if it's warmup is not in a defined state
+        // i.e.- it is a float representing a time
+        return Object.values(weaponstates.hasOwnProperty).indexOf(this.warmup) == -1;
+    }
+
+    /**
      * Updates the weapon's cooldown and warmup after it is fired
      */
     fire(){
-        this.cooldown = now();
+        this.cooldown = UTILS.now();
         if(this.weapontype.warmup) this.warmup = weaponstates.FIRED;
     }
 
@@ -119,8 +132,8 @@ export class Weapon {
         // Check that this weapon is actually a chargeable weapon
         if(!this.weapontype.warmup) return Infinity;
 
-        // Check if this.warmup is a weaponstate
-        if(weaponstates.indexOf(this.warmup) > -1) return Infinity;
+        // Makesure that the weapon is actually charging
+        if(!this.isCharging()) return Infinity;
 
         // If now is not supplied, call it ourselves
         // I'm doing this second since it costs more to call now() than to check
@@ -207,6 +220,6 @@ export class Item{
 
     use(){
         // If this item is consumable, remove a quantity (min. 0 after removing)
-        if(this.itemtype.isConsumable) this.quantity = max(this.quantity - 1, 0);
+        if(this.itemtype.isConsumable) this.quantity = Math.max(this.quantity - 1, 0);
     }
 }

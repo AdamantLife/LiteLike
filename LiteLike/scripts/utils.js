@@ -52,23 +52,18 @@ export function randomChoice(array, random){
 }
 
 
-// Adapted from https://stackoverflow.com/a/16081647
-const NOW = performance.now ||
-performance.mozNow    ||
-performance.msNow     ||
-performance.oNow      ||
-performance.webkitNow ||            
-Date.now;
 
 
 /**
  * @returns The time in milliseconds since the browser tab was last loaded
+ * 
+ * Taken from https://stackoverflow.com/a/16081647
  */
 export function now(){
     /** DEVNOTE - This timing mechanism is not appropriate for long-term storage as it is based on page load time
      *              It therefore should not be used resource collection
     */
-    return NOW();
+   return performance.now();
 }
 
 /**
