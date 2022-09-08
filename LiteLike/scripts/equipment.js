@@ -26,18 +26,22 @@ export class WeaponType{
      * @param {Number} warmup - A float representing how long a weapon takes to inflict damage
      *                      after it has been activated
      * @param {Symbol} range - The range of the weapon from weaponranges
+     * @param {Number} weight - how much a single qty weighs (contributes to the Transport's Capacity)
      */
-    constructor(id, damage, cooldown, warmup, range){
+    constructor(id, damage, cooldown, warmup, range, weight){
         this.id = id;
         this.damage = damage;
         this.cooldown = cooldown;
         this.warmup = warmup;
         this.range = range;
+        this.weight = weight;
     }
 }
 
 /**
  * A specific instance of a WeaponType
+ * 
+ * TODO: Add Ammuniton-Type Weapons
  */
 export class Weapon {
     /**
@@ -193,13 +197,15 @@ export class ItemType{
      * @param {Boolean} isConsumable - A boolean indicating whether the item instance
      *                              should be destroyed upon use.
      * @param {Number | null} cooldown - A cooldown that must elapse between uses
+     * @param {Number} weight - how much a single qty weighs (contributes to the Transport's Capacity)
      */
-    constructor(id, target, callback, isConsumable, cooldown){
+    constructor(id, target, callback, isConsumable, cooldown, weight){
         this.id = id;
         this.target = target;
         this.callback = callback;
         this.isConsumable = bool(isConsumable);
         this.cooldown = cooldown;
+        this.weight = weight;
     }
 }
 
@@ -222,4 +228,27 @@ export class Item{
         // If this item is consumable, remove a quantity (min. 0 after removing)
         if(this.itemtype.isConsumable) this.quantity = Math.max(this.quantity - 1, 0);
     }
+}
+
+/**
+ * Transport is our version of Wagon from A Dark Room
+ * Translations from ADR:
+ *      - reactorPower => Water (maxReactorPower)
+ *      - capacity => capacity
+ */
+export class Transport{
+    /**
+     * 
+     * @param {Number} id - A Unique identifier
+     * @param {*} maxReactorPower - The amount of power the Transport can hold (refills at HomeBase)
+     * @param {*} capacity - The amount weight (for items and weapons)
+     */
+    constructor(id, reactorPower, capacity){
+        this.id = id;
+        this.maxReactorPower = maxReactorPower;
+        this.capacity = capacity;
+        // The transport is topped off by default
+        this.reactorPower = this.maxReactorPower;
+    }
+
 }

@@ -26,5 +26,19 @@
             "isConsumable":true,
             "cooldown":1000
         }
+    ],
+    "transport":[
+        {
+            "reactorPower":10,
+            "capacity":10
+        },
+        {
+            "reactorPower":15,
+            "capacity":15
+        },
+        {
+            "reactorPower":20,
+            "capacity":20
+        }
     ]
 }

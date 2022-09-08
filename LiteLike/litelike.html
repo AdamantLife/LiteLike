@@ -2,21 +2,24 @@
 <html>
     <head>
         <style>
+            #menu>* {
+                display:block;
+            }
         </style>
     </head>
     <body>
-        <button id="startGame">Start Demo</button>
+        <div id="menu"></div>
 
         <div id="fightBox">
 
         </div>
         
         <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+        <script type="module" src="scripts/demos.js"></script>
         <script type="module" src="scripts/game.js"></script>
         <script>
             window.onload = ()=>{
             console.log(GAME.random());
-            document.getElementById("startGame").onclick = GAME.runDemo.bind(GAME);
             }
         </script>
     </body>

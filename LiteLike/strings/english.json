@@ -30,5 +30,19 @@
             "name": "Repair Bot",
             "flavor": "A modest, battery-powered robot which repairs your mech"
         }
+    ],
+    "transport":[
+        {
+            "name": "Lugger",
+            "flavor": "It's old and rusty, but this stellar tugship is up to the task of hauling your mech from sector to sector."
+        },
+        {
+            "name": "Brig",
+            "flavor": "A proper starship with ample space for a mech bay"
+        },
+        {
+            "name": "Barge",
+            "flavor": "A large space-fairing ship with ample room for supplies"
+        }
     ]
 }
