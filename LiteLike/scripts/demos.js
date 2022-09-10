@@ -1,7 +1,7 @@
 "use strict";
 
 import * as IO from "./io.js";
-import * as EQUIP from "./equipment.js";
+import * as EQUIP from "./items.js";
 import {CombatCharacter, roles} from "./character.js";
 import {Combat, CharacterAction, actiontypes} from "./combat.js";
 import * as MAP from "./map.js";

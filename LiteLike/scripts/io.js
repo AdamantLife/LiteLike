@@ -1,5 +1,5 @@
 "use strict";
-import * as EQUIP from "./equipment.js";
+import * as EQUIP from "./items.js";
 import {instanceFromJSON} from "./utils.js";
 import {callbacks} from "./callbacks.js";
 
@@ -56,7 +56,7 @@ export function loadEquipment(){
         return {weapons, armor, items};
     }
 
-    return fetch("./entities/equipment.json")   // Fetch equipment.json from the server
+    return fetch("./entities/items.json")   // Fetch items.json from the server
         .then(r=>r.json())                      // Then convert the file to an Object (json)
         .then(data=>parse(data))                // The pass the converted object to the parse function
     // Return the resulting promise so that the calling function can take

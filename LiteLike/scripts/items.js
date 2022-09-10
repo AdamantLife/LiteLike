@@ -14,6 +14,25 @@ export const weaponstates = UTILS.enumerate(
     );
 
 /**
+ * A superclass for stackable items (items with quantities) and have weight
+ */
+class Stackable {
+    /**
+     * 
+     * @param {Number} quantity - The quantity in this stack
+     * @param {*} weight - The weight per item
+     */
+    constructor(quantity, weight){
+        this.quantity = quantity;
+        this.weight = weight;
+    }
+
+    get totalWeight(){
+        return this.quantity * this.weight;
+    }
+}
+
+/**
  * A class for describing attack options
  */
 export class WeaponType{
@@ -212,21 +231,50 @@ export class ItemType{
 /**
  * The instance-class of an ItemType
  */
-export class Item{
+export class Item extends Stackable{
     /**
      * 
      * @param {ItemType} itemtype - The itemtype this item instance represents
      * @param {Number} quantity - The number of items in the stack.
      */
     constructor(itemtype, quantity){
+        super(quantity, itemtype.weight);
         this.itemtype = itemtype
-        this.quantity = quantity
         this.cooldown = null;
     }
 
     use(){
         // If this item is consumable, remove a quantity (min. 0 after removing)
         if(this.itemtype.isConsumable) this.quantity = Math.max(this.quantity - 1, 0);
+    }
+}
+
+/**
+ * Base class for Resources
+ */
+export class ResourceType{
+    /**
+     * 
+     * @param {Number} id - A unique identifier for this ResourceType
+     * @param {Number} weight - The weight per resourceType
+     */
+    constructor(id, weight){
+        this.id = id;
+        this.weight = weight;
+    }
+}
+
+/**
+ * The instance-class of an ResourceType
+ */
+export class Resource extends Stackable{
+    /**
+     * 
+     * @param {ResourceType} resourceType - The resource type this item represents
+     * @param {Number} quantity - The number of resources in the stack
+     */
+    constructor(resourceType, quantity){
+        super(quantity, resourceType.weight);
     }
 }
 

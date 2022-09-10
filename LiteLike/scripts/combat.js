@@ -1,7 +1,7 @@
 "use strict";
 
 import * as UTILS from "./utils.js";
-import {weaponranges, weaponstates} from "./equipment.js";
+import {weaponranges, weaponstates} from "./items.js";
 
 const LOOPRATE = 1000 / 16; // 1 second in ms, at 16fps
 

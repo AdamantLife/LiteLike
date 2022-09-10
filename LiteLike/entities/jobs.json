@@ -1,0 +1,18 @@
+{
+    "job":[
+        {
+            "resourcesGenerated":{
+                "0": 1
+            },
+            "resourcesRequired":{},
+            "collectionTime": 1000
+        },
+        {
+            "resourcesGenerated": {
+                "1": 5
+            },
+            "resourcesRequired":{},
+            "collectionTime": 5000
+        }
+    ]
+}

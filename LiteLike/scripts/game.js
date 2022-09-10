@@ -5,7 +5,7 @@ import {PlayerCharacter, roles} from "./character.js";
 import * as MAP from "./map.js";
 import * as EVENTS from "./events.js";
 import * as IO from "./io.js";
-import * as EQUIP from "./equipment.js";
+import * as EQUIP from "./items.js";
 
 
 export class Game{

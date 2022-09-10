@@ -31,6 +31,16 @@
             "flavor": "A modest, battery-powered robot which repairs your mech"
         }
     ],
+    "resource":[
+        {
+            "name": "Provisions",
+            "flavor": "Food. It may be space, but food is still just food."
+        },
+        {
+            "name": "Battery",
+            "flavor": "Your standard ZZZ Battery that gets slapped in the back of your everyday electronics"
+        }
+    ],
     "transport":[
         {
             "name": "Lugger",
@@ -43,6 +53,16 @@
         {
             "name": "Barge",
             "flavor": "A large space-fairing ship with ample room for supplies"
+        }
+    ],
+    "job":[
+        {
+            "name": "Grow Food",
+            "flavor": "The colonists farm, weed, prune, pick, water, and do whatever is necessary to get food from the ground and from trees in the colony"
+        },
+        {
+            "name": "Charge Batteries",
+            "flavor": "The works run on (futuristically-efficient) treadmills in order to charge batteries"
         }
     ]
 }
