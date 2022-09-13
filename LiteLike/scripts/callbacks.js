@@ -19,4 +19,8 @@ function heal(target, value){
     }
 }
 
-export const callbacks = Object.freeze({HEAL:heal });
+export const itemCallbacks = Object.freeze({HEAL:heal });
+
+function setUnlock(colony){
+
+}

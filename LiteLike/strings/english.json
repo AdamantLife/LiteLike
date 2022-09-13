@@ -39,6 +39,10 @@
         {
             "name": "Battery",
             "flavor": "Your standard ZZZ Battery that gets slapped in the back of your everyday electronics"
+        },
+        {
+            "name": "Scrap",
+            "flavor": "Reuse, Recycle... don't Reduce; we need every piece we can get"
         }
     ],
     "transport":[
@@ -53,6 +57,17 @@
         {
             "name": "Barge",
             "flavor": "A large space-fairing ship with ample room for supplies"
+        }
+    ],
+
+    " sector":[
+        {
+            "name": "Residential Sector",
+            "flavor": "Housing for residents of The Colony"
+        },
+        {
+            "name": "Scout Bots",
+            "flavor": "This sector maintains Scout Bots which periodically scout nearby planets for food and supplies"
         }
     ],
     "job":[

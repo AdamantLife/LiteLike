@@ -1,14 +1,14 @@
 "use strict";
 import * as EQUIP from "./items.js";
 import {instanceFromJSON} from "./utils.js";
-import {callbacks} from "./callbacks.js";
+import {itemCallbacks} from "./callbacks.js";
 
 /**
  * Loads the equipment json file and parses it into equipment classes
  */
 export function loadEquipment(){
     function parse(data){
-        let weapons = [], armor = [], items = [];
+        let weapons = [], armor = [], items = [], resources = [], transports = [];
 
         // Weapons can all be parsed directly from json
         // Each Weapon's id is its index in the weapon array
@@ -47,13 +47,35 @@ export function loadEquipment(){
             delete item.arguments;
             // Convert the callback name  to the actual callback
             // as returned by the callback factory
-            item.callback = callbacks[cb](...args);
+            item.callback = itemCallbacks[cb](...args);
 
             // add item to list
             items.push(instanceFromJSON(EQUIP.ItemType, item));
         }
 
-        return {weapons, armor, items};
+        // Resources can all be parsed driectly from json
+        // Each Resource's id is its index in the Resource array
+        for(let id = 0; id < data.resource.length; id++){
+            // Get resource by id
+            let res = data.resource[id];
+            // Set the resource's id
+            res.id = id;
+            // Convert json to Resource Object and add to list
+            resources.push(instanceFromJSON(EQUIP.ResourceType, res));
+        }
+
+        // Transports can all be parsed driectly from json
+        // Each Transport's id is its index in the Transport array
+        for(let id = 0; id < data.transport.length; id++){
+            // Get transport by id
+            let tran = data.transport[id];
+            // Set the transport's id
+            tran.id = id;
+            // Convert json to Transport Object and add to list
+            resources.push(instanceFromJSON(EQUIP.Transport, tran));
+        }
+
+        return {weapons, armor, items, resources, transports};
     }
 
     return fetch("./entities/items.json")   // Fetch items.json from the server
@@ -92,6 +114,8 @@ export function getStrings(language, object){
             id=object.id;
             dict = language.character;
             break;
+
+        // ITEMS
         case "Weapon":
         case "WeaponType":
             id = typeof object.weapontype === "undefined" ? object.id : object.weapontype.id;
@@ -105,6 +129,25 @@ export function getStrings(language, object){
         case "ItemType":
             id = typeof object.itemtype === "undefined" ? object.id : object.itemtype.id;
             dict = language.item;
+            break;
+        case "Resource":
+        case "ResourceType":
+            id = typeof object.resourcetype === "undefined" ? object.id : object.resourcetype.id;
+            dict = language.resource;
+            break;
+        case "Transport":
+            id = object.id;
+            dict = language.transport;
+            break;
+
+        // BASE SPECIFIC
+        case "Sector":
+            id= obj.id;
+            dict = language.sector;
+            break;
+        case "Job":
+            id = obj.id;
+            dict = language.job;
             break;
         default:
             return {"name":"Unknown", "flavor": "Unknown"}

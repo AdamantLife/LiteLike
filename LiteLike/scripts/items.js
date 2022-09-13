@@ -270,11 +270,12 @@ export class ResourceType{
 export class Resource extends Stackable{
     /**
      * 
-     * @param {ResourceType} resourceType - The resource type this item represents
+     * @param {ResourceType} resourcetype - The resource type this item represents
      * @param {Number} quantity - The number of resources in the stack
      */
-    constructor(resourceType, quantity){
-        super(quantity, resourceType.weight);
+    constructor(resourcetype, quantity){
+        super(quantity, resourcetype.weight);
+        this.resourcetype = resourcetype;
     }
 }
 

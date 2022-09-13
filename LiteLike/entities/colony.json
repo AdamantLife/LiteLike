@@ -1,0 +1,47 @@
+{
+    "sector":[
+        {
+            "prerequisites":[],
+            "max":10,
+            "resourcesRequired":[
+                [1, 15]
+            ],
+            "flags":[]
+        },
+        {
+            "prerequisites": ["ENGINEER"],
+            "max":10,
+            "resourcesRequired": [
+                [1, 10],
+                [2, 20]
+            ],
+            "flags":[]
+        },
+        {
+            "prerequisites": ["FARMER"],
+            "max":1,
+            "resourcesRequired": [
+                [1, 10],
+                [2, 10]
+            ],
+            "flags":["AGRICULTURE"]
+        }
+    ],
+    "job":[
+        {
+            "resourcesGenerated":{
+                "0": 1
+            },
+            "resourcesRequired":[],
+            "collectionTime": 1000,
+            "prerequisites": ["AGRICULTURE"]
+        },
+        {
+            "resourcesGenerated": {
+                "1": 5
+            },
+            "resourcesRequired":[],
+            "collectionTime": 5000
+        }
+    ]
+}
