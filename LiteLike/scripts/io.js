@@ -1,36 +1,41 @@
 "use strict";
 import * as EQUIP from "./items.js";
+import * as COLONY from "./homebase.js";
 import {instanceFromJSON} from "./utils.js";
 import {itemCallbacks} from "./callbacks.js";
 
 /**
- * Loads the equipment json file and parses it into equipment classes
+ * Most objects can be created directly from the provided json dict.
+ * This function uses instanceFromJSON to do so.
+ * @param {Object} data - Json data
+ * @param {Prototype} objecttype - The object to create based on the json data
+ * @returns 
  */
-export function loadEquipment(){
+function parseStandardJson(data, objecttype){
+    let output = [];
+    // Each data item's index is its id
+    for(let id = 0; id < data.length; id++){
+        // Get item by id
+        let item = data[id];
+        // Set the weapon's id
+        item.id = id;
+        // Convert the json object to the desired object
+        output.push(instanceFromJSON(objecttype, item));
+    }
+    return output;
+}
+
+/**
+ * Loads the items json file and parses it into item classes
+ */
+export function loadItems(){
     function parse(data){
         let weapons = [], armor = [], items = [], resources = [], transports = [];
 
-        // Weapons can all be parsed directly from json
-        // Each Weapon's id is its index in the weapon array
-        for(let id = 0; id < data.weapon.length; id++){
-            // Get weapon by id
-            let weapon = data.weapon[id];
-            // Set the weapon's id
-            weapon.id = id;
-            // Add the WeaponType Instance to the weapons output
-            weapons.push(instanceFromJSON(EQUIP.WeaponType, weapon));
-        }
+        weapons = parseStandardJson(data.weapon, EQUIP.WeaponType);
 
-        // Armor can all be parsed driectly from json
-        // Each Armor's id is its index in the Armor array
-        for(let id = 0; id < data.armor.length; id++){
-            // Get armor by id
-            let arm = data.armor[id];
-            // Set the armor's id
-            arm.id = id;
-            armor.push(instanceFromJSON(EQUIP.Armor, arm));
-        }
-
+        armor = parseStandardJson(data.armor, EQUIP.Armor);
+        
         // Item callbacks need to be generated based on their arguments
         // Each Item's id is its index in the Item array
         for(let id = 0; id < data.item.length; id++){
@@ -53,27 +58,9 @@ export function loadEquipment(){
             items.push(instanceFromJSON(EQUIP.ItemType, item));
         }
 
-        // Resources can all be parsed driectly from json
-        // Each Resource's id is its index in the Resource array
-        for(let id = 0; id < data.resource.length; id++){
-            // Get resource by id
-            let res = data.resource[id];
-            // Set the resource's id
-            res.id = id;
-            // Convert json to Resource Object and add to list
-            resources.push(instanceFromJSON(EQUIP.ResourceType, res));
-        }
+        resources = parseStandardJson(data.resource, EQUIP.ResourceType);
 
-        // Transports can all be parsed driectly from json
-        // Each Transport's id is its index in the Transport array
-        for(let id = 0; id < data.transport.length; id++){
-            // Get transport by id
-            let tran = data.transport[id];
-            // Set the transport's id
-            tran.id = id;
-            // Convert json to Transport Object and add to list
-            resources.push(instanceFromJSON(EQUIP.Transport, tran));
-        }
+        transports = parseStandardJson(data.transport, EQUIP.Transport);
 
         return {weapons, armor, items, resources, transports};
     }
@@ -98,6 +85,25 @@ export function loadStrings(language){
     return fetch(`./strings/${language}.json`) // Fetch the language dict from the server
         .then(r=>r.json()); // Then convert the file to an Object (json)
     // Return the resulting promise so the calling function can do something afterwards
+}
+
+export function loadColony(){
+
+    function parse(data){
+        let jobs = {}, sectors = {};
+
+        jobs = parseStandardJson(data.job, COLONY.Job);
+        sectors = parseStandardJson(data.sector, COLONY.Sector);
+
+
+        return {jobs, sectors};
+    }
+
+    return fetch("./entities/colony.json")   // Fetch items.json from the server
+        .then(r=>r.json())                      // Then convert the file to an Object (json)
+        .then(data=>parse(data))                // The pass the converted object to the parse function
+    // Return the resulting promise so that the calling function can take
+    // action after it is done
 }
 
 /**

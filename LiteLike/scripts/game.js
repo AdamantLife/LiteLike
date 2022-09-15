@@ -1,6 +1,7 @@
 "use strict";
 
 import {PlayerCharacter, roles} from "./character.js";
+import { TheColony } from "./homebase.js";
 
 import * as MAP from "./map.js";
 import * as EVENTS from "./events.js";
@@ -32,15 +33,24 @@ export class Game{
             .then(result=>{this.STRINGS = result;}) // Store the Language Lookup Object in STRINGS
             .catch(error=> console.log(error));
 
-        // Database of all equipment
-        this.EQUIPMENT = null;
-        // Load the equipment
-        IO.loadEquipment()
-            .then(result=>{this.EQUIPMENT = result;})
+        // Database of all items
+        this.ITEMS = null;
+        // Load the items
+        IO.loadItems()
+            .then(result=>{this.ITEMS = result;})
             .catch(error=> console.log(error));
 
-        // Plyaer Character
+        this.JOBS = null;
+        this.SECTORS = null;
+        IO.loadColony()
+            .then(result=>{this.JOBS = result.jobs; this.SECTORS = result.sectors;})
+            .catch(error=> console.log(error));
+
+        // Player Character
         this.PLAYER = null;
+
+        // The Colony
+        this.COLONY = null;
 
         // Current Map
         this.MAP = null;
@@ -56,10 +66,14 @@ export class Game{
         return new PlayerCharacter(0, [roles.CHARACTER, roles.PLAYER],
             {hp:5, currentHP: 5},
             {
-                weapons: [new EQUIP.Weapon(this.EQUIPMENT.weapons[0])],
-                armor:this.EQUIPMENT.armor[0],
-                items:[new EQUIP.Item(this.EQUIPMENT.items[0], 1)]
+                weapons: [new EQUIP.Weapon(this.ITEMS.weapons[0])],
+                armor:this.ITEMS.armor[0],
+                items:[new EQUIP.Item(this.ITEMS.items[0], 1)]
             })
+    }
+
+    initializeColony(){
+        return new TheColony(this, 0);
     }
 }
 

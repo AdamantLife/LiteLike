@@ -6,7 +6,7 @@ import * as UTILS from "./utils.js";
 // Max powerLevel of TheColony
 const MAXPOWER = 10;
 // How often Meeple get Hungery (in ms)
-const HUNGERRATE = 10000;
+export const HUNGERRATE = 10000;
 
 // The Facilities which unlock resource-gathering Jobs for Meeple
 // This would be things like the Coal Mine or Steel Mine in A Dark Room
@@ -14,7 +14,7 @@ const HUNGERRATE = 10000;
 const unlocks = UTILS.enumerate("ENGINEER","FARMER","AGRICULTURE","D","E","F");
 
 // Sectors are base upgrades
-const sectors = utils.enumerate(
+const sectors = UTILS.enumerate(
     "RESIDENTIAL",  // Our version of Houses
     "SCOUTBOTS"   // Our version of Traps
     )
@@ -26,7 +26,9 @@ const sectors = utils.enumerate(
  * DevNote- Resources are stored by ID in the array, which means that the array
  *          may have some/many empty indexes.
  */
-export class TheColony {
+export class TheColony extends UTILS.EventListener{
+    static EVENTTYPES = UTILS.enumerate("startupdate","endupdate","resourcesmodified", "meeplemodified");
+
     /**
      * 
      * @param {Game} game - The current Game Object
@@ -37,9 +39,10 @@ export class TheColony {
      * @param {Meeple[]} meeples - An  array containing Meeple Instances
      */
     constructor(game, powerLevel, sectors, unlocks, resources, meeples){
+        super(TheColony.EVENTTYPES);
         this.game = game;
         this.powerLevel = 0;
-        if(Number.isInteger(powerLevel)) this.powerLevel = math.min(math.max(0, powerLevel), MAXPOWER);
+        if(Number.isInteger(powerLevel)) this.powerLevel = Math.min(Math.max(0, powerLevel), MAXPOWER);
 
         let sect = [];
         if(sectors && typeof sectors !== "undefined") sect = Array.from(sectors);
@@ -65,10 +68,58 @@ export class TheColony {
         this.meeples = mep;
     }
 
+    /**
+     * Adds the given quantity of the supplied resource this The Colony's inventory
+     * @param {ResourceType|Resource} resource - The resource to be added
+     * @param {Number|undefined} qty - The amount to be added to the inventory. If
+     *                  not supplied, then resource should be a Resource instance
+     *                  and it's quantity will be used instead. Its quantity will
+     *                  then be set to 0.
+     */
+    addResource(resource, qty){
+        // Handle if a Resource instance was passed
+        if(resource.hasOwnProperty("resourcetype")){
+            // We can copy qty if qty is not supplied
+            if(typeof qty === "undefined"){
+                qty = resource.quantity;
+                resource.quantity = 0;
+            }
+            // We only want the resourcetype
+            resource = resource.resourcetype;
+        }
+
+        // If we never had any of this resource, set it to 0 instead of undefined
+        if(typeof this.resources[resource.id] === "undefined") this.resources[resource.id] = 0;
+
+        // Add qty to our Resource's quantity
+        this.resources[resource.id] += qty;
+    }
+
+
+    /**
+     * Creates a new Meeple, adds it to this.meeples, and returns the Meeple
+     * @param {Number} now - performance.now
+     */
+    addNewMeeple(now){
+        if(!now || typeof now === "undefined") now = UTILS.now();
+        let meeple = new Meeple(GAME.JOBS[0], now, now);
+        this.meeples.push(meeple);
+        return meeple;
+    }
+
+    /**
+     * Updates all timers and resolves all consequences on The Colony
+     */
     updateLoop(){
         let now = UTILS.now();
+        this.triggerEvent(TheColony.EVENTTYPES.startupdate, {now});
         this.updateMeepleStates(now);
-        this.resolveMeeple();
+        let [resourcechange, deadmeeple] = this.resolveMeeple();
+        // We gained and/or loss resources
+        if(resourcechange.length) this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange});
+        // We loss Meeple
+        if(deadmeeple.length) this.triggerEvent(TheColony.EVENTTYPES.meeplemodified, {deadmeeple});
+        this.triggerEvent(TheColony.EVENTTYPES.endupdate, {now});
     }
 
     /**
@@ -89,11 +140,13 @@ export class TheColony {
      *  * If it needs food, feed it
      *      * If we don't have food, it dies
      * @param {Number} now - performance.now
-     * @returns {Array} - Meeple that died of starvation
+     * @returns {Array} - First (0) index is total reource modification, second is Meeple that died of starvation
      */
     resolveMeeple(now){
         // canCollect is used to check job.resourcesRequired
         let canCollect = true;
+        // Total Resource Changes for event purproses
+        let resources = [];
         // An area to gather dead Meeples so we can  remove and return them
         let deadMeeples = [];
         for(let meeple of this.meeples){
@@ -104,7 +157,7 @@ export class TheColony {
 
                     if(this.resources[resource.id]                                  // We have an entry at that resource id
                         && typeof this.resources[resource.id] !== "undefined"       // It is not undefined
-                        && this.resources[resource.id].quantity >= qty) continue;   // We have enough of the resource, so don't worry
+                        && this.resources[resource.id] >= qty) continue;   // We have enough of the resource, so don't worry
                     
                     // We don't have the resource or don't have enough of it
                     // so flag the collection and stop checking other resources
@@ -121,12 +174,21 @@ export class TheColony {
                     // First pay for the resourcesRequired
                     for(let [resource, qty] of meeple.job.resourcesRequired){
                         // Subtract qty from our Resource's quantity
-                        this.resources[resource.id].quantity -= qty;
+                        this.resources[resource.id] -= qty;
+                        
+                        // Add resource modification to resources output
+                        if(typeof resources[resource.id] === "undefined") resources[resource.id] = 0;
+                        resources[resource.id] -= qty;
+                        
                     }
                     // The Collect Resources
                     for(let [resource, qty] of meeple.job.resourcesGenerated){
-                        // Add qty to our Resource's quantity
-                        this.resources[resource.id].quantity += qty;
+                        // Adds the amount of qty to this.resources
+                        this.addResource(resource, qty);
+
+                        // Add resource modification to resources output
+                        if(typeof resources[resource.id] === "undefined") resources[resource.id] = 0;
+                        resources[resource.id] += qty;
                     }
 
                     // Clear Timer's ready flag
@@ -141,8 +203,7 @@ export class TheColony {
             if(meeple.hungerTimer.isReady){
                 // We have no food...
                 if(!this.resources[0]
-                    || typeof this.resources[0] == "undefined"
-                    || !this.resources[0].quantity){
+                    || typeof this.resources[0] == "undefined"){
                         // I guess the meeple dies
                         deadMeeples.push(meeple);
                 }
@@ -159,7 +220,7 @@ export class TheColony {
             this.meeples.splice(this.meeples.indexOf(meeple),1);
         }
 
-        return deadMeeples;
+        return [resources, deadMeeples];
     }
 
 }
@@ -350,7 +411,7 @@ class Timer {
     }
 }
 
-class Job{
+export class Job{
     /**
      * 
      * @param {Object} resourcesGenerated - An object of resource ID's generated and their quantities
@@ -364,7 +425,7 @@ class Job{
     }
 }
 
-class Sector {
+export class Sector {
     /**
      * 
      * @param {Symbol[]} prerequisites - Colony.unlocks that are required
@@ -417,12 +478,12 @@ class Sector {
             // If we can't afford a resource, exit immediately
             if(!resources[res]
                 || typeof resources[res] === "undefined"
-                || resources[res].quantity < qty) return;
+                || resources[res] < qty) return;
         }
 
         // Subtract the resources
         for(let [res,qty] of cost){
-            resources[res].quantity -= qty;
+            resources[res] -= qty;
         }
 
         // Level Up

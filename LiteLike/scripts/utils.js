@@ -74,3 +74,109 @@ export function now(){
 export function instanceFromJSON(cls, jsn){
     return Object.assign(Object.create(cls.prototype), jsn);
 }
+
+
+export class EventListener{
+
+    constructor(events){
+        // Super Simple EventListener setup
+        this._events = events;
+        this._listeners = {};
+        for(let sym of Object.values(this._events)){
+            this._listeners[sym] = [];
+        }
+    }
+
+    /**
+     * Internal method to validate the Eventtype passed to Add and Remove Listeners
+     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
+     *                                  (either the stringname or the enumeration)
+     * @returns {Symbol} - The enumerated symbol from EVENTTYPES
+     */
+    _validateEventType(eventtype){
+        // If eventtype is a string, convert it to the Enumerated value
+        if(typeof eventtype == "string"){ 
+            // note that this may result in undefined if this is not a
+            // valid eventtype string, which will fail the next check
+            eventtype = this._events[eventtype];
+        }
+        
+        // Check that eventtype is a Symbol in EVENTTYPES
+        // As with other places in the code, this should raise an Error,
+        // but we're trying to keep this simple so we'll just fail silently
+        if(Object.values(this._events).indexOf(eventtype) < 0) return;
+
+        return eventtype;
+    }
+
+    /**
+     * Adds an eventlistener to the Combat
+     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
+     *                                  (either the stringname or the enumeration)
+     * @param {Function} callback - The callback to call
+     */
+    addEventListener(eventtype, callback){
+        // Make sure eventtype is valid
+        eventtype = this._validateEventType(eventtype);
+        // If eventtype was invalid, it will now be null and we will fail silently
+        if(!eventtype) return;
+        
+        // Event has already been registered, so do nothing
+        if(this._listeners[eventtype].indexOf(callback) > -1) return;
+
+        // Register the callback under its type
+        this._listeners[eventtype].push(callback);
+    }
+
+    /**
+     * Removes an eventlistener from the Combat
+     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
+     *                                  (either the stringname or the enumeration)
+     * @param {*} callback - The callback to remove
+     */
+    removeEventListener(eventtype, callback){
+        // Make sure eventtype is valid
+        eventtype = this._validateEventType(eventtype);
+        // If eventtype was invalid, it will now be null and we will fail silently
+        if(!eventtype) return;
+
+        let listeners = this._listeners[eventtype];
+        // Get the index of the callback to remove it from the array
+        let eventindex = listeners.indexOf(callback);
+
+        // If the callback isn't in the array, we'll fail silently
+        if(eventindex < 0) return;
+
+        // Remove callback from listeners
+        listeners.splice(eventindex, 1);
+    }
+
+    /**
+     * Call all Callbacks for the given eventtype
+     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
+     *                                  (either the stringname or the enumeration) 
+     * @param {Object} additional - Additional properties to add to the Event Object
+     */
+    triggerEvent(eventtype, additional){
+        eventtype = this._validateEventType(eventtype);
+        let event = new Event(eventtype.toString());
+        Object.assign(event, this.getDefaultEventData());
+        // If additional properties were passed, add them
+        if(additional && typeof additional !== "undefined"){
+            Object.assign(event,additional);
+        }
+        for(let listener of this._listeners[eventtype]){
+            let result = listener(event);
+            // TODO: consider cancelling combat via listener
+        }
+    }
+
+    /**
+     * This function provides information univeral to all callbacks from 
+     * this object. This function should be overwritten in subclasses.
+     * @returns {Object} - The default data; an empty object if not implemented
+     */
+    getDefaultEventData(){
+        return {};
+    }
+}

@@ -29,17 +29,14 @@
     ],
     "job":[
         {
-            "resourcesGenerated":{
-                "0": 1
-            },
+            "resourcesGenerated":[
+                [0, 1]],
             "resourcesRequired":[],
-            "collectionTime": 1000,
+            "collectionTime": 5000,
             "prerequisites": ["AGRICULTURE"]
         },
         {
-            "resourcesGenerated": {
-                "1": 5
-            },
+            "resourcesGenerated": [[1, 5]],
             "resourcesRequired":[],
             "collectionTime": 5000
         }

@@ -2,18 +2,28 @@
 
 import * as IO from "./io.js";
 import * as EQUIP from "./items.js";
+import * as UTILS from "./utils.js";
 import {CombatCharacter, roles} from "./character.js";
 import {Combat, CharacterAction, actiontypes} from "./combat.js";
+import {HUNGERRATE} from "./homebase.js";
 import * as MAP from "./map.js";
 
 function toggleAllButtons(disabled){
     for (let button of document.querySelectorAll("#menu>button")) button.disabled = disabled;
 }
 
+function clearDemoBox(){
+    let demoBox = document.getElementById("demoBox");
+    while(demoBox.lastElementChild) demoBox.lastElementChild.remove();
+}
+
 function combatDemo(){
         // Disable all buttons to avoid shenanigans
         toggleAllButtons(true);
+        clearDemoBox();
 
+        document.getElementById("demoBox").insertAdjacentHTML("beforeend", `<div id="fightBox"></div>`);
+        
         // Get the output space
         let fightbox = document.getElementById("fightBox");
 
@@ -30,8 +40,8 @@ function combatDemo(){
                 "currentHP": 7
             },
             {
-                "weapons": [new EQUIP.Weapon(GAME.EQUIPMENT.weapons[1])],
-                "armor": GAME.EQUIPMENT.armor[0],
+                "weapons": [new EQUIP.Weapon(GAME.ITEMS.weapons[1])],
+                "armor": GAME.ITEMS.armor[0],
                 "items":[]
             });
 
@@ -291,12 +301,91 @@ function combatDemo(){
         GAME.COMBAT.combatLoop();
     }
 
+function meepleDemo(){
+    // Disable all buttons to avoid shenanigans
+    toggleAllButtons(true);
+    clearDemoBox();
+
+    GAME.COLONY = GAME.initializeColony();
+
+    document.getElementById("demoBox").insertAdjacentHTML("beforeend", `<div id="meepleBox"></div>`);
+
+    let meepleBox = document.getElementById("meepleBox");
+    
+    meepleBox.insertAdjacentHTML("beforeend", `<h3>Resources</h3><table id="resources"><tbody></tbody></table>`);
+    let resourceBody = document.querySelector("#resources>tbody");
+    for(let [id, resource] of Object.entries(GAME.ITEMS.resources)){
+        GAME.COLONY.addResource(resource, 0);
+        let restring = IO.getStrings(GAME.STRINGS, resource);
+        resourceBody.insertAdjacentHTML("beforeend", `<tr data-id="${id}"><td title="${restring.flavor}">${restring.name}</td><td data-quantity>0</td></tr>`);
+    }
+
+
+    meepleBox.insertAdjacentHTML("beforeend", `<h3>Meeples</h3><table id="meeple"><thead><tr><th></th><th>Job</th><th>Hunger</th></tr></thead><tbody></tbody>`);
+
+    let meepleBody = document.querySelector("#meeple>tbody");
+    let now = UTILS.now();
+    let meeple;
+    var meepleindex = 0;
+    for(meepleindex; meepleindex < 5; meepleindex++){
+        meeple = GAME.COLONY.addNewMeeple(now);
+        meeple.id = meepleindex;
+        meepleBody.insertAdjacentHTML("beforeend", `<tr data-id="meeple${meeple.id}"><td style="font-weight:bold;">${meeple.id}</td><td><span data-timer="job">0</span>/${meeple.job.collectionTime}</td><td><span data-timer="hunger">0</span>/${HUNGERRATE}</td></tr>`);
+    }
+    
+    function addMeeple(){
+        meeple = GAME.COLONY.addNewMeeple();
+        meeple.id = meepleindex;
+        meepleindex+=1;
+        meepleBody.insertAdjacentHTML("beforeend", `<tr data-id="meeple${meeple.id}"><td style="font-weight:bold;">${meeple.id}</td><td><span data-timer="job">0</span>/${meeple.job.collectionTime}</td><td><span data-timer="hunger">0</span>/${HUNGERRATE}</td></tr>`);
+    }
+
+    function updateGUI(event){
+        let resources = GAME.COLONY.resources;
+        for(let i = 0; i < resources.length; i++){
+            let qty = resources[i];
+            if(!qty || typeof qty === "undefined")continue;
+            let row = resourceBody.querySelector(`tr[data-id= ${i}"]`);
+            row.querySelector("td[data-quantity]").textContent = qty;
+        }
+
+        let meeple = GAME.COLONY.meeple;
+        let id = meeple[0].id;
+        for(let meep of meeple){
+            while(meep.id > id){
+                id+=1;
+                let row = meepleBody.querySelector(`td[data-id="meeple${id}"]`);
+                if(row && typeof row !== "undefined")row.remove();
+            }
+            
+            let row = meepleBody.querySelector(`td[data-id="meeple${id}"]`);
+            row.querySelector(`span[data-timer="job"]`).textContent = meep.jobTimer.getOffsetTime(event.now);
+            row.querySelector(`span[data-timer="hunger"]`).textContent = meep.hungerTimer.getOffsetTime(event.now);
+        }
+    }
+
+    function finishDemo(){
+        toggleAllButtons(false);
+    }
+
+    meepleBox.insertAdjacentHTML("beforeend", `<button id="addmeeple">Add Meeple</button>`);
+    meepleBox.insertAdjacentHTML("beforeend", `<button id="quitmeeple">Quit Demo</button>`);
+
+    document.getElementById("addmeeple").onclick = addMeeple;
+    document.getElementById("quitmeeple").onclick = finishDemo;
+
+    GAME.COLONY.addEventListener("endupdate", updateGUI);
+
+    
+}
+
 function mapDemo(){
     
 }
 
 var DEMOBUTTONS = {
     "startCombat": {text:"Start Combat Demo", target: combatDemo},
+    "startMeeple": {text:"Start Meeple Demo", target: meepleDemo},
     "startMap": {text: "Start Map Demo", target: mapDemo}
     };
 

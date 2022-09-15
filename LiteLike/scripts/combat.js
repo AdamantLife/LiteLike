@@ -38,7 +38,7 @@ export class CharacterAction{
 /**
  * A Combat Instance
  */
-export class Combat{
+export class Combat extends UTILS.EventListener{
     static EVENTTYPES = UTILS.enumerate("startloop","endloop","startstack","endstack","useweapon", "useitem", "endcombat");
 
     /**
@@ -47,6 +47,7 @@ export class Combat{
      * @param {Character} enemy - The Enemy Character
      */
     constructor(player, enemy){
+        super(Combat.EVENTTYPES);
         this.player = player;
         this.enemy = enemy;
         this.victor = null;
@@ -54,102 +55,15 @@ export class Combat{
         this.playerQueue = [];
         this.playerDistance = weaponranges.RANGED;
         this.enemyDistance = weaponranges.RANGED;
-        
-        // Super Simple EventListener setup
-        this._listeners = {};
-        for(let sym of Object.values(Combat.EVENTTYPES)){
-            this._listeners[sym] = [];
-        }
-
     }
 
-    /**
-     * Internal method to validate the Eventtype passed to Add and Remove Listeners
-     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
-     *                                  (either the stringname or the enumeration)
-     * @returns {Symbol} - The enumerated symbol from EVENTTYPES
-     */
-    _validateEventType(eventtype){
-        // If eventtype is a string, convert it to the Enumerated value
-        if(typeof eventtype == "string"){ 
-            // note that this may result in undefined if this is not a
-            // valid eventtype string, which will fail the next check
-            eventtype = Combat.EVENTTYPES[eventtype];
-        }
-        
-        // Check that eventtype is a Symbol in EVENTTYPES
-        // As with other places in the code, this should raise an Error,
-        // but we're trying to keep this simple so we'll just fail silently
-        if(Object.values(Combat.EVENTTYPES).indexOf(eventtype) < 0) return;
-
-        return eventtype;
-    }
-
-    /**
-     * Adds an eventlistener to the Combat
-     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
-     *                                  (either the stringname or the enumeration)
-     * @param {Function} callback - The callback to call
-     */
-    addEventListener(eventtype, callback){
-        // Make sure eventtype is valid
-        eventtype = this._validateEventType(eventtype);
-        // If eventtype was invalid, it will now be null and we will fail silently
-        if(!eventtype) return;
-        
-        // Event has already been registered, so do nothing
-        if(this._listeners[eventtype].indexOf(callback) > -1) return;
-
-        // Register the callback under its type
-        this._listeners[eventtype].push(callback);
-    }
-
-    /**
-     * Removes an eventlistener from the Combat
-     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
-     *                                  (either the stringname or the enumeration)
-     * @param {*} callback - The callback to remove
-     */
-    removeEventListener(eventtype, callback){
-        // Make sure eventtype is valid
-        eventtype = this._validateEventType(eventtype);
-        // If eventtype was invalid, it will now be null and we will fail silently
-        if(!eventtype) return;
-
-        let listeners = this._listeners[eventtype];
-        // Get the index of the callback to remove it from the array
-        let eventindex = listeners.indexOf(callback);
-
-        // If the callback isn't in the array, we'll fail silently
-        if(eventindex < 0) return;
-
-        // Remove callback from listeners
-        listeners.splice(eventindex, 1);
-    }
-
-    /**
-     * Call all Callbacks for the given eventtype
-     * @param {String | Symbol} eventtype - The eventtype which triggers the callback
-     *                                  (either the stringname or the enumeration) 
-     * @param {Object} additional - Additional properties to add to the Event Object
-     */
-    triggerEvent(eventtype, additional){
-        eventtype = this._validateEventType(eventtype);
-        let event = new Event(eventtype.toString());
-        Object.assign(event, {
+    getDefaultEventData(){
+        return {
             "combat": this,
             "player": this.player,
             "enemy":this.enemy,
             "time":UTILS.now()
-        });
-        // If additional properties were passed, add them
-        if(additional && typeof additional !== "undefined"){
-            Object.assign(event,additional);
-        }
-        for(let listener of this._listeners[eventtype]){
-            let result = listener(event);
-            // TODO: consider cancelling combat via listener
-        }
+        };
     }
 
     /**
