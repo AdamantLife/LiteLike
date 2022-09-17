@@ -14,7 +14,7 @@ export const HUNGERRATE = 10000;
 const unlocks = UTILS.enumerate("ENGINEER","FARMER","AGRICULTURE","D","E","F");
 
 // Sectors are base upgrades
-const sectors = UTILS.enumerate(
+export const sectors = UTILS.enumerate(
     "RESIDENTIAL",  // Our version of Houses
     "SCOUTBOTS"   // Our version of Traps
     )
@@ -27,7 +27,11 @@ const sectors = UTILS.enumerate(
  *          may have some/many empty indexes.
  */
 export class TheColony extends UTILS.EventListener{
-    static EVENTTYPES = UTILS.enumerate("startupdate","endupdate","resourcesmodified", "meeplemodified");
+    static EVENTTYPES = UTILS.enumerate(
+        "startupdate","endupdate",
+        "startmeepleupdate", "endmeepleupdate",
+        "startsectorupdate", "endsectorupdate",
+        "resourcesmodified", "meeplemodified");
 
     /**
      * 
@@ -70,7 +74,7 @@ export class TheColony extends UTILS.EventListener{
 
     /**
      * Adds the given quantity of the supplied resource this The Colony's inventory
-     * @param {ResourceType|Resource} resource - The resource to be added
+     * @param {ResourceType|Resource|Number} resource - The resource to be added or it's id
      * @param {Number|undefined} qty - The amount to be added to the inventory. If
      *                  not supplied, then resource should be a Resource instance
      *                  and it's quantity will be used instead. Its quantity will
@@ -88,11 +92,17 @@ export class TheColony extends UTILS.EventListener{
             resource = resource.resourcetype;
         }
 
+        // resource is a ResourceType
+        if(resource.hasOwnProperty("id")){
+            // Convert it just to an id
+            resource = resource.id;
+        }
+
         // If we never had any of this resource, set it to 0 instead of undefined
-        if(typeof this.resources[resource.id] === "undefined") this.resources[resource.id] = 0;
+        if(typeof this.resources[resource] === "undefined") this.resources[resource] = 0;
 
         // Add qty to our Resource's quantity
-        this.resources[resource.id] += qty;
+        this.resources[resource] += qty;
     }
 
 
@@ -101,25 +111,72 @@ export class TheColony extends UTILS.EventListener{
      * @param {Number} now - performance.now
      */
     addNewMeeple(now){
+        // Get now() if necessary
         if(!now || typeof now === "undefined") now = UTILS.now();
+
+        // Create a new Meeple with the Default (0) Job, and it's Job and Hunger
+        // Timers should be sync'd with now()
         let meeple = new Meeple(GAME.JOBS[0], now, now);
+
+        // Add Meeple to our list
         this.meeples.push(meeple);
+
         return meeple;
     }
 
     /**
-     * Updates all timers and resolves all consequences on The Colony
+     * The background resource-collection loop that runs while
+     * the page is open and constantly updates Meeple and Sectors
      */
-    updateLoop(){
+    colonyLoop(){
+        // Get now() so all functions are using the same now()
         let now = UTILS.now();
+
+        // Trigger the startupdate event
         this.triggerEvent(TheColony.EVENTTYPES.startupdate, {now});
+
+        // Handle all meeple subroutines
+        let [resourcechange, deadmeeple] = this.meepleLoop(now);
+
+        // Handle all sector subroutines
+        this.sectorLoop(now);
+        
+        // Trigger the endupdate event
+        // The endupdate event contains all updates
+        this.triggerEvent(TheColony.EVENTTYPES.endupdate, {now, resourcechange, deadmeeple});
+
+        // Set next timeout
+        this.loopid = window.setTimeout(this.colonyLoop.bind(this), UTILS.LOOPRATE);
+    }
+
+    /**
+     * Updates all timers and resolves all consequences on The Colony
+     * @param {Number} now - performance.now
+     * @returns {Array} A length-2 array containing resourcechange and deadmeeple
+     */
+    meepleLoop(now){
+        // Get now if not provided
+        if(!now || typeof now === "undefined") now = UTILS.now();
+
+        // Trigger the startmeepleupdate event
+        this.triggerEvent(TheColony.EVENTTYPES.startmeepleupdate, {now});
+
+        // Update all Timers on all Meeples
         this.updateMeepleStates(now);
+        
+        // Handle consequences of the updated Timers
         let [resourcechange, deadmeeple] = this.resolveMeeple();
-        // We gained and/or loss resources
+
+        // We gained and/or loss resources, so Trigger event
         if(resourcechange.length) this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange});
-        // We loss Meeple
+
+        // We loss Meeple, so Trigger Event
         if(deadmeeple.length) this.triggerEvent(TheColony.EVENTTYPES.meeplemodified, {deadmeeple});
-        this.triggerEvent(TheColony.EVENTTYPES.endupdate, {now});
+
+        // Trigger the endmeepleupdateevent
+        this.triggerEvent(TheColony.EVENTTYPES.endmeepleupdate, {now});
+
+        return [resourcechange, deadmeeple];
     }
 
     /**
@@ -129,7 +186,7 @@ export class TheColony extends UTILS.EventListener{
     updateMeepleStates(now){
         for(let meeple of this.meeples){
             // Update Job and Hunger Timers
-            meeple.updateTimers();
+            meeple.updateTimers(now);
         }
     }
 
@@ -210,12 +267,13 @@ export class TheColony extends UTILS.EventListener{
                 else{
                     // Feed the Meeple
                     this.resources[0] -= 1;
+                    meeple.hungerTimer.clearReady();
                 }
             }
         }
 
         // Remove the dead Meeple from the roster
-        for(let meeple of this.deadMeeples){
+        for(let meeple of deadMeeples){
             // Remove meeple at the given index from this.meeple
             this.meeples.splice(this.meeples.indexOf(meeple),1);
         }
@@ -223,6 +281,28 @@ export class TheColony extends UTILS.EventListener{
         return [resources, deadMeeples];
     }
 
+    /**
+     * Updates all Sector Timers and resolves any consequences
+     * DEVNOTE- The residential sector is the proc-ability, so we'll handle it
+     *          inline. If we add more, then we should set up a resolveSector
+     *          function like we have for Meeple.
+     * @param {Number} now - performance.now
+     */
+    sectorLoop(now){
+        // Get now() if not supplied
+        if(!now || typeof now === "undefined") now = UTILS.now();
+
+        // Trigger startsectorupdate Event
+        this.triggerEvent(TheColony.EVENTTYPES.startsectorupdate, {now});
+
+        for(let sector of this.sectors){
+
+        }
+
+        // Trigger endsectorupdate Event
+        this.triggerEvent(TheColony.EVENTTYPES.endsectorupdate, {now});
+        return;
+    }
 }
 
 /**
@@ -250,9 +330,15 @@ class Meeple{
      * @param {Number} now - time at which the Meeple started its current job
      */
     assignJob(job, now){
+        // Don't do anything if the Meeple's job isn't changing
         if(job == this.job) return;
+
+        // Change job
         this.job = job;
+        // Get now if not provided
         if(!now || typeof now === "undefined") now = UTILS.now();
+
+        // Create a new JobTimer for the new Job
         this.jobTimer = new Timer(now, job.collectionTime);
     }
 
@@ -268,6 +354,11 @@ class Meeple{
 }
 
 class Timer {
+    /**
+     * 
+     * @param {Number} startTime - performance.now
+     * @param {Number} rate - The time that elapses between cycles
+     */
     constructor(startTime, rate){
         this.startTime = startTime;
         this.rate = rate;
@@ -283,7 +374,7 @@ class Timer {
      * @returns {Boolean} - Whether or not the Timer can be collected from
      */
     get isReady(){
-        return this._collectFlag;
+        return Boolean(this._collectFlag);
     }
 
     /**
@@ -343,10 +434,17 @@ class Timer {
         // The Meeple has completed one or more Job Cycles since the last time
         // it was updated
         if(cycles > this.cycles){
+            // Set Meeple to be collected from
+            /**
+             * DEVNOTE- There is no reason at the moment for this._collectFlag
+             *      to ever be more than 1 (updateLoops should be running faster
+             *      than Timers), but just incase that changes, we'll set it to
+             *      the difference instead of just true.
+             */
+            this._collectFlag = cycles - this.cycles;
+
             // Update cycles
             this.cycles = cycles;
-            // Set Meeple to be collected from
-            this._collectFlag = true;
         }
     }
 
@@ -414,8 +512,8 @@ class Timer {
 export class Job{
     /**
      * 
-     * @param {Object} resourcesGenerated - An object of resource ID's generated and their quantities
-     * @param {Object} resourcesRequired - An object of resource ID's required and their quantities
+     * @param {Array} resourcesGenerated - An object of resource ID's generated and their quantities
+     * @param {Array} resourcesRequired - An object of resource ID's required and their quantities
      * @param {Number} collectionTime - Amount of millis it takes to complete the job
      */
     constructor(resourcesGenerated, resourcesRequired, collectionTime){
@@ -428,20 +526,25 @@ export class Job{
 export class Sector {
     /**
      * 
+     * @param {Symbol} sectorType - The sectortype from the sectors enumeration
      * @param {Symbol[]} prerequisites - Colony.unlocks that are required
-     * @param {*} level - The current level of the Sector
-     * @param {*} maxlevel - The max level the Sector can achieve
-     * @param {*} levelRate - The rate at which resourcesRequired increases for each level
-     * @param {*} resourcesRequired - The resources needed to raise the Sector's level
-     * @param {*} flags - Flags that are set when this Sector is first built
+     * @param {Number} level - The current level of the Sector
+     * @param {Number} maxlevel - The max level the Sector can achieve
+     * @param {Number} levelRate - The rate at which resourcesRequired increases for each level
+     * @param {Array[]} resourcesRequired - The resources needed to raise the Sector's level
+     * @param {String[]} flags - Flags that are set when this Sector is first built
+     * @param {Number} collectionTime - Amount of millis the Sector is on cooldown for
      */
-    constructor(prerequisites, level, maxlevel, levelRate, resourcesRequired, flags){
+    constructor(sectorType, prerequisites, level, maxlevel, levelRate, resourcesRequired, flags, collectionTime){
+        this.sectorType = sectorType;
         this.prerequisites = prerequisites;
         this.level = level;
         this.maxlevel = maxlevel;
         this.levelRate = levelRate;
         this.resourcesRequired = resourcesRequired;
         this.flags = flags;
+        this.collectionTime = collectionTime;
+        this.timer = new Timer(UTILS.now(), this.collectionTime);
     }
 
     /**

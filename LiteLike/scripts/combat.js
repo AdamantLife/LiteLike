@@ -3,8 +3,6 @@
 import * as UTILS from "./utils.js";
 import {weaponranges, weaponstates} from "./items.js";
 
-const LOOPRATE = 1000 / 16; // 1 second in ms, at 16fps
-
 /**
  * Description of a combat callback
  * DEVNOTE- Since we're emulating A Dark Room, we're only concerned with 1v1
@@ -103,7 +101,7 @@ export class Combat extends UTILS.EventListener{
         this.triggerEvent(Combat.EVENTTYPES.endloop);
 
         // Set next timeout
-        window.setTimeout(this.combatLoop.bind(this), LOOPRATE);
+        window.setTimeout(this.combatLoop.bind(this), UTILS.LOOPRATE);
     }
 
     /**

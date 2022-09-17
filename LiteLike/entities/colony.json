@@ -1,21 +1,25 @@
 {
     "sector":[
         {
+            "sectorType":"RESIDENTIAL",
             "prerequisites":[],
             "max":10,
             "resourcesRequired":[
                 [1, 15]
             ],
-            "flags":[]
+            "flags":[],
+            "collectionTime":5000
         },
         {
+            "sectorType": "SCOUTBOTS",
             "prerequisites": ["ENGINEER"],
             "max":10,
             "resourcesRequired": [
                 [1, 10],
                 [2, 20]
             ],
-            "flags":[]
+            "flags":[],
+            "collectionTime": 5000
         },
         {
             "prerequisites": ["FARMER"],

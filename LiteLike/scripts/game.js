@@ -1,7 +1,7 @@
 "use strict";
 
 import {PlayerCharacter, roles} from "./character.js";
-import { TheColony } from "./homebase.js";
+import { TheColony } from "./colony.js";
 
 import * as MAP from "./map.js";
 import * as EVENTS from "./events.js";

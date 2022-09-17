@@ -1,3 +1,6 @@
+// How often loops in the game update
+const LOOPRATE = 1000 / 16; // 1 second in ms, at 16fps
+
 /**
  * Converts the provided arguments into a frozen object
  * @returns {Object} - A frozen object of the given arguments 

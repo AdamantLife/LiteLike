@@ -1,6 +1,6 @@
 "use strict";
 import * as EQUIP from "./items.js";
-import * as COLONY from "./homebase.js";
+import * as COLONY from "./colony.js";
 import {instanceFromJSON} from "./utils.js";
 import {itemCallbacks} from "./callbacks.js";
 
@@ -92,9 +92,15 @@ export function loadColony(){
     function parse(data){
         let jobs = {}, sectors = {};
 
+        // Jobs are standard format
         jobs = parseStandardJson(data.job, COLONY.Job);
+        // Sectors can be parsed as standard format, but we need to update their sectorType
         sectors = parseStandardJson(data.sector, COLONY.Sector);
 
+        for(let sector of Object.values(sectors)){
+            // Converting sectorType to the Enumerated Symbol
+            sector.sectorType = COLONY.sectors[sector.sectorType];
+        }
 
         return {jobs, sectors};
     }
@@ -148,11 +154,11 @@ export function getStrings(language, object){
 
         // BASE SPECIFIC
         case "Sector":
-            id= obj.id;
+            id= object.id;
             dict = language.sector;
             break;
         case "Job":
-            id = obj.id;
+            id = object.id;
             dict = language.job;
             break;
         default:

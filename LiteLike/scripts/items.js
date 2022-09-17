@@ -289,7 +289,7 @@ export class Transport{
     /**
      * 
      * @param {Number} id - A Unique identifier
-     * @param {*} maxReactorPower - The amount of power the Transport can hold (refills at HomeBase)
+     * @param {*} maxReactorPower - The amount of power the Transport can hold (refills at TheColony)
      * @param {*} capacity - The amount weight (for items and weapons)
      */
     constructor(id, reactorPower, capacity){
