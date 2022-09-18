@@ -3,7 +3,7 @@
         {
             "sectorType":"RESIDENTIAL",
             "prerequisites":[],
-            "max":10,
+            "maxLevel":10,
             "resourcesRequired":[
                 [1, 15]
             ],
@@ -13,7 +13,7 @@
         {
             "sectorType": "SCOUTBOTS",
             "prerequisites": ["ENGINEER"],
-            "max":10,
+            "maxLevel":10,
             "resourcesRequired": [
                 [1, 10],
                 [2, 20]
@@ -22,13 +22,15 @@
             "collectionTime": 5000
         },
         {
+            "sectorType": "AGRICULTURE",
             "prerequisites": ["FARMER"],
-            "max":1,
+            "maxLevel":1,
             "resourcesRequired": [
                 [1, 10],
                 [2, 10]
             ],
-            "flags":["AGRICULTURE"]
+            "flags":["AGRICULTURE"],
+            "collectionTime": 10000
         }
     ],
     "job":[
