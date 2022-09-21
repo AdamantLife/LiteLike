@@ -75,7 +75,8 @@ export function now(){
  * @param {Object} jsn - The json to be assigned to the class
  */
 export function instanceFromJSON(cls, jsn){
-    return Object.assign(Object.create(cls.prototype), jsn);
+    let obj = new cls();
+    return Object.assign(obj, jsn);
 }
 
 

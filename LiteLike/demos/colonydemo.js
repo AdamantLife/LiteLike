@@ -3,7 +3,7 @@
 import {toggleAllButtons, clearDemoBox} from "./utils.js";
 import * as IO from "../scripts/io.js";
 import * as UTILS from "../scripts/utils.js";
-import {HUNGERRATE} from "../scripts/colony.js";
+import {HUNGERRATE, Sector} from "../scripts/colony.js";
 
 export function colonyDemo(){
     // Disable all buttons to avoid shenanigans
@@ -36,6 +36,34 @@ export function colonyDemo(){
 
         // Create a row for the resource which displays its name and quantity (with Flavor Text on hover)
         resourceBody.insertAdjacentHTML("beforeend", `<tr data-id="${id}"><td title="${restring.flavor}">${restring.name}</td><td data-quantity>0</td></tr>`);
+    }
+
+    let FLASHES = [];
+
+    /**
+     * When the player attempts to spend resources they don't have, this
+     * callback flashes the required resources 3 times over 1.5 seconds
+     * @param {Event} event - The noresources event which triggers this callback
+     */
+    function flashResources(event){
+        let resources = [];
+
+        let qty;
+        // Iterate over the noresources attribute
+        for (let i = 0; i < event.noresources.length; i++){
+            qty = event.noresources[qty];
+            // Resource Lists may have blank spaces (and we can't be missing qty 0 resources)
+            if(!qty || typeof qty === "undefined") continue;
+            // Add resource to the list
+            resources.push(i);
+        }
+
+        // For each missing resource
+        for(let resource of resources){
+            // Get the row for the research and start an animation
+            resourceBody.querySelector(`tr[data-id="${resource}"]`).animate([{text:"red",text:"unset"}], {duration: 500, iterations: 3});
+        }
+        
     }
 
     /** MEEPLE SETUP */
@@ -111,14 +139,22 @@ export function colonyDemo(){
     demoBox.insertAdjacentHTML("beforeend", `<div id="sectorBox"><h3>Sectors</h3><table id="sectorTable"><thead><tr><th></th><th>Level</th><th>Progress</th></tr></thead><tbody></tbody></table></div>`);
 
     // Give The Colony all unlocks
-    for(let unlock of COLONY.unlocks){
+    for(let unlock of GAME.COLONY.unlocks){
         GAME.COLONY.unlock(unlock);
     }
 
+    // Keep track of Sector Strings for ease of use later
+    let sectorStrings = {};
+
     // Give The Colony all sectors (They should be level 0)
-    for(let sectortype of GAME.SECTORS){
-        GAME.COLONY.addSector(sectortype)
+    for(let sector of GAME.SECTORS){
+        GAME.COLONY.addSector(sector)
+        // Reset the Sector's timer
+        sector.newTimer();
+        // And cache the strings
+        sectorStrings[sector.sectorType] = IO.getStrings(GAME.STRINGS, sector);
     }
+
 
     // Add GUI
 
@@ -141,18 +177,50 @@ export function colonyDemo(){
     let sectorBody = document.querySelector("#sectorTable>tbody");
     
     for(let sector of GAME.COLONY.sectors){
-        let strings = IO.getStrings(GAME.STRINGS, sector);
+        let strings = sectorStrings[sector.sectorType];
 
         // Hovering on the Level Up Button will show the current cost
         let costString = constructSectorLevelCost(sector.calculateResourceRequirements());
         
         // Create HTML
-        sectorBody.insertAdjacentHTML("beforeend", `<tr><td data-type="${sector.sectorType.toString()}"><button title="${costString}">Power ${strings.name}</button></td><td>${sector.level}</td><td><div data-timer><span data-timer>0</span>/${sector.collectionTime}</div><div data-collection style="display:none;"><button>Collect</button></div></td></tr>`);
+        sectorBody.insertAdjacentHTML("beforeend", `<tr data-type="${sector.sectorType.toString()}"><td data-name><button title="${costString}">Power ${strings.name}</button></td><td>${sector.level}</td><td><div data-timer><span data-timer>0</span>/${sector.collectionTime}</div><div data-collection style="display:none;"><button>Collect</button></div></td></tr>`);
 
         // Attach callbacks to buttons
-        //TODO
+        let lastrow = sectorBody.lastElementChild;
+        lastrow.querySelector(`td[data-name]>button`).onclick = (e)=> sector.raiseLevel(GAME.COLONY);
+        lastrow.querySelector(`td>div[data-collection]>button`).onclick = (e)=>GAME.COLONY.collectSector(sector);
     }
 
+    /**
+     * Updates the GUI to show that a sector has been expanded
+     * @param {Event} event - The sectorexpanded event
+     */
+    function updateSector(event){
+        let sector = event.sector
+        let row = sectorBody.querySelector(`tr[data-type="${sector.sectorType}"]`);
+
+        // Update Upgrade Button
+        let button = row.querySelector(`td[data-name]>button`)
+        // Sector just powered on and it has more than 1 level
+        if(sector.level == 1 && sector.maxLevel > 1){
+            // Change text to say "Expand"
+            button.textContent = `Expand ${sectorStrings[sector.sectorType]}`;
+            // Change the cost to upgrade
+            button.title = constructSectorLevelCost(sector.calculateResourceRequirements());
+        }
+        
+        else{ // Sector Max Level
+            // Change button text
+            button.textContent = "Fully Expanded";
+            // Change the cost to be blank
+            button.title = ""
+            // Disable Button
+            button.disabled = true;
+        } 
+    }
+    // Listen for callbacks to provide player feedback
+    GAME.COLONY.addEventListener("noresources", flashResources);
+    GAME.COLONY.addEventListener("sectorexpanded", updateSector);
 
     /** ADDITIONAL SETUP */
 
@@ -205,7 +273,22 @@ export function colonyDemo(){
             row.querySelector(`span[data-timer="hunger"]`).textContent = meeple.hungerTimer.getOffsetTime(event.now).toFixed(3);
         }
         
-        
+        // Update Sector's timers
+        for(let sector of GAME.COLONY.sectors){
+            let timer = sectorBody.querySelector(`tr[data-type="${sector.sectorType.toString()}"]>td>div[data-timer]`)
+            let collection = sectorBody.querySelector(`tr[data-type="${sector.sectorType.toString()}"]>td>div[data-collection]`)
+            // If timer is frozen, make sure Collect Button is showing and the Timer Div is hidden
+            if(sector.timer.isFrozen){
+                timer.style.display = "none";
+                collection.style.display = "block";
+            }else {// Timer is running if not Frozen
+                 // Timer should be visible and updating
+                timer.style.display = "block";
+                collection.style.display = "none";
+                // Update timer
+                timer.querySelector("span[data-timer]").textContent = sector.timer.getOffsetTime(event.now).toFixed(3);
+            }
+        }
     }
 
     /**

@@ -60,7 +60,7 @@
         }
     ],
 
-    " sector":[
+    "sector":[
         {
             "name": "Residential Sector",
             "flavor": "Housing for residents of The Colony"
@@ -68,6 +68,10 @@
         {
             "name": "Scout Bots",
             "flavor": "This sector maintains Scout Bots which periodically scout nearby planets for food and supplies"
+        },
+        {
+            "name": "Farm Bots",
+            "flavor": "A vertical farm fueled by artifical light. Sure, it only grows greens, but when you're adrift in space you can't really be picky."
         }
     ],
     "job":[

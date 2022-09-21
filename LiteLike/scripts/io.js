@@ -154,7 +154,7 @@ export function getStrings(language, object){
 
         // BASE SPECIFIC
         case "Sector":
-            id= object.id;
+            id= Object.values(COLONY.sectors).indexOf(object.sectorType);
             dict = language.sector;
             break;
         case "Job":

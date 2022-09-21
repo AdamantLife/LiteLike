@@ -13,6 +13,8 @@ export const HUNGERRATE = 10000;
 export const RESIDENTIALMEEPLE = 4;
 // Chance of increasing the Meeple Population
 export const RESIDENTIALRATE = .3;
+// Number of Meeple The Colony can support without Residential Sectors
+export const BASEMEEPLE = 5;
 
 // The Facilities which unlock resource-gathering Jobs for Meeple
 // This would be things like the Coal Mine or Steel Mine in A Dark Room
@@ -22,7 +24,8 @@ export const unlocks = UTILS.enumerate("ENGINEER","FARMER","AGRICULTURE","D","E"
 // Sectors are base upgrades
 export const sectors = UTILS.enumerate(
     "RESIDENTIAL",  // Our version of Houses
-    "SCOUTBOTS"   // Our version of Traps
+    "SCOUTBOTS",   // Our version of Traps
+    "AGRICULTURE"   // new sector
     )
 
 /**
@@ -38,8 +41,9 @@ export class TheColony extends UTILS.EventListener{
         "startmeepleupdate", "endmeepleupdate",
         "startsectorupdate", "endsectorupdate",
         "resourcesmodified", "meeplemodified",
-        "sectoradded", "sectorupgraded",
-        "unlockadded"
+        "sectoradded", "sectorexpanded", "noresources",
+        "unlockadded", "nounlock",
+        "badtimer"
         );
 
     /**
@@ -119,15 +123,15 @@ export class TheColony extends UTILS.EventListener{
      * @param {Symbol} flag - The unlock Symbol to add
      */
     unlock(flag){
-        // If we already have the given unlock, ignore it
-        if(this.unlocks.indexOf(flag) >= 0) return;
-
         // If flag is not a Symbol, try to convert it
         if(typeof flag !== "symbol") flag = unlocks[flag];
 
         // Make sure flag is a valid unlock Symbol
         // If not, as with other places in the code, we'll just ignore it
         if(Object.values(unlocks).indexOf(flag) < 0) return;
+
+        // If we already have the given unlock, ignore it
+        if(this.unlocks.indexOf(flag) >= 0) return;
 
         // Flag is valid, so add it
         this.unlocks.push(flag);
@@ -158,7 +162,7 @@ export class TheColony extends UTILS.EventListener{
     /**
      * Adds the given sector to The Colony's sector list
      * @param {Sector} sector - The sector to be added
-     * @returns {null | Sector}- If succuessful, returns the sector, otherwise returns null
+     * @returns {Sector | null}- If succuessful, returns the sector, otherwise returns null
      */
     addSector(sector){
         // Make sure we don't already have a sector of this type
@@ -167,11 +171,17 @@ export class TheColony extends UTILS.EventListener{
             if(sect.sectorType == sector.sectorType) return;
         }
 
+        let nounlock = [];
         // Make sure The Colony meets all prerequisites to add the Sector
         for(let prereq of sector.prerequisites){
-            // We don't have the prerequisite unlocked, so return
-            if(this.unlocks.indexOf(prereq) < 0) return;
+            // We have the prerequisite unlocked, so continue
+            if(this.unlocks.indexOf(prereq) > 0) continue;
+            // Otherwise, log the missing prereq
+            nounlock.push(prereq);
         }
+
+        // nounlock.length > 0 means we are missing prereqs, so trigger and return
+        if(nounlock.length) return this.triggerEvent(TheColony.EVENTTYPES.nounlock, {sector, nounlock});
 
         // We meet all prerequisites, so add Sector
         this.sectors.push(sector);
@@ -381,6 +391,27 @@ export class TheColony extends UTILS.EventListener{
         this.triggerEvent(TheColony.EVENTTYPES.endsectorupdate, {now});
         return;
     }
+
+    /**
+     * Trigger's the sector's callback if it is ready and clears its Frozen state
+     * @param {Sector} sector - The sector to collect from
+     */
+    triggerSector(sector){
+        // We only collect from sectors we control
+        // DEVNOTE- As noted elsewhere in the code, normally we should raise
+        //          an error, but we we'll just fail silently for simplicity's sake
+        if(this.sectors.indexOf(sector) < 0) return;
+
+        // Make sure timer is ready
+        // DEVNOTE- Unlike above, we will trigger an event in this case as it
+        //          is potentially a common miscall
+        if(!sector.timer.isReady) return this.triggerEvent("badtimer", {target: sector});
+
+        // Sector is ready, so call 
+        sectorCallbacks[sector.sectorType](sector, this, this.game.random);
+        // NOTE- Normally, all sectors should be frozen
+        if(sector.timer.isFrozen) sector.unfreeze();
+    }
 }
 
 /**
@@ -460,6 +491,25 @@ class Timer {
      */
     get isFrozen(){
         return Boolean(this._frozen);
+    }
+
+    /**
+     * Resets the Timer's current state (unfreezes, clears ready, clears cycles)
+     * If now is provided, startTime will be set to it; otherwise, utils.now will be called
+     * @param {Number} now - performance.now
+     */
+    reset(now){
+        if(typeof now === "undefined") now = UTILS.now();
+        // Calling freeze to make sure nothing happens
+        this.freeze();
+        // Clear Cycles
+        this.cycles = 0;
+        // Clear Ready
+        this.clearReady();
+        // Update startTime
+        this.startTime = now;
+        // Unfreeze; since preserve was undefined, no offset will be used
+        this.unfreeze();
     }
 
     /**
@@ -607,15 +657,17 @@ export class Sector {
      * @param {Symbol} sectorType - The sectortype from the sectors enumeration
      * @param {Symbol[]} prerequisites - Colony.unlocks that are required
      * @param {Number} level - The current level of the Sector
-     * @param {Number} maxlevel - The max level the Sector can achieve
+     * @param {Number} maxLevel - The max level the Sector can achieve
      * @param {Number} levelRate - The rate at which resourcesRequired increases for each level
      * @param {Array[]} resourcesRequired - The resources needed to raise the Sector's level
      * @param {String[]} flags - Flags that are set when this Sector is first built
      * @param {Number} collectionTime - Amount of millis the Sector is on cooldown for
      */
-    constructor(sectorType, prerequisites, level, maxlevel, levelRate, resourcesRequired, flags, collectionTime){
+    constructor(sectorType, prerequisites, level, maxLevel, levelRate, resourcesRequired, flags, collectionTime){
         this.sectorType = sectorType;
         let prereqs = [];
+        // Convert prerequisites if it is undefined
+        if(!prerequisites || typeof prerequisites === "undefined") prerequisites = [];
         // Make sure all prerequisites are valid unlock Symbols
         for(let prereq of prerequisites){
             // Convert prerequisite if it is not a Symbol
@@ -636,13 +688,13 @@ export class Sector {
         this.prerequisites = prereqs;
         // Unless otherwise specified, Sectors start at level 0
         this.level = typeof level === "undefined" ? 0 : level;
-        this.maxlevel = maxlevel;
+        this.maxLevel = maxLevel;
         // Default levelRate is .2
         this.levelRate = typeof levelRate === "undefined" ? .2 : level;
         this.resourcesRequired = resourcesRequired;
         this.flags = flags;
         this.collectionTime = collectionTime;
-        this.timer = new Timer(UTILS.now(), this.collectionTime);
+        this.timer = undefined;
     }
 
     /**
@@ -663,6 +715,7 @@ export class Sector {
      * If it can, the Sector's Level is incremented by 1.
      * If the Sector is already max level, return before anything else
      * @param {TheColony} colony - The colony to charge for the upgrade
+     * @returns {Sector | null} - Returns null if The Colony is capped or cannot afford the upgrade, otherwise returns the sector
      */
     raiseLevel(colony){
         // Don't level up if we can't
@@ -674,13 +727,19 @@ export class Sector {
         // We're going to be calling colony.resources a lot
         let resources = colony.resources;
 
+        let noresources = [];
         // Check that we can afford the upgrade
         for(let [res, qty] of cost){
-            // If we can't afford a resource, exit immediately
-            if(!resources[res]
-                || typeof resources[res] === "undefined"
-                || resources[res] < qty) return;
+            // If we have enough resources, continue
+            if(resources[res]
+                && typeof resources[res] === "undefined"
+                && resources[res] >= qty) continue;
+            // We don't have enough resources, so log it
+            noresources[res] = qty;
         }
+
+        // If length of noresources > 0, we are missing resources, so trigger and return
+        if(noresources.length) return colony.triggerEvent(TheColony.EVENTTYPES.noresources, {sector:this, noresources});
 
         // Subtract the resources
         for(let [res,qty] of cost){
@@ -692,6 +751,13 @@ export class Sector {
         
         // If this is our first level, set any flags
         if(this.level == 1) this.setFlags();
+
+        // Signal that we have upgraded
+        colony.triggerEvent(TheColony.EVENTTYPES.sectorexpanded, {sector: this});
+        // Signal that resources have changed
+        colony.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {cost});
+
+        return this;
     }
     
     /**
@@ -707,6 +773,11 @@ export class Sector {
             // Set the unlock for the Colony
             colony.unlock(unlocks[flag]);
         }
+    }
+
+    newTimer(now){
+        if(typeof now === "undefined") now = UTILS.now();
+        this.timer = new Timer(now, this.collectionTime);
     }
 
 }

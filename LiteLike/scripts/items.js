@@ -222,7 +222,7 @@ export class ItemType{
         this.id = id;
         this.target = target;
         this.callback = callback;
-        this.isConsumable = bool(isConsumable);
+        this.isConsumable = Boolean(isConsumable);
         this.cooldown = cooldown;
         this.weight = weight;
     }
@@ -289,11 +289,13 @@ export class Transport{
     /**
      * 
      * @param {Number} id - A Unique identifier
-     * @param {*} maxReactorPower - The amount of power the Transport can hold (refills at TheColony)
-     * @param {*} capacity - The amount weight (for items and weapons)
+     * @param {Number} reactorPower- The amount of reactorPower the Transport currently has
+     * @param {Number} maxReactorPower - The amount of power the Transport can hold (refills at TheColony)
+     * @param {Number} capacity - The amount weight (for items and weapons)
      */
-    constructor(id, reactorPower, capacity){
+    constructor(id, reactorPower, maxReactorPower, capacity){
         this.id = id;
+        this.reactorPower = reactorPower;
         this.maxReactorPower = maxReactorPower;
         this.capacity = capacity;
         // The transport is topped off by default
