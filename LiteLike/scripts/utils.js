@@ -163,7 +163,7 @@ export class EventListener{
      */
     triggerEvent(eventtype, additional){
         eventtype = this._validateEventType(eventtype);
-        let event = new Event(eventtype.toString());
+        let event = new Event(eventtype.description);
         Object.assign(event, this.getDefaultEventData());
         // If additional properties were passed, add them
         if(additional && typeof additional !== "undefined"){
@@ -182,5 +182,182 @@ export class EventListener{
      */
     getDefaultEventData(){
         return {};
+    }
+}
+
+export class Timer {
+    /**
+     * 
+     * @param {Number} startTime - performance.now
+     * @param {Number} rate - The time that elapses between cycles
+     */
+    constructor(startTime, rate){
+        this.startTime = startTime;
+        this.rate = rate;
+
+        this._frozen = null;
+
+        this.cycles = 0;
+        this._collectFlag = false;
+    }
+    
+
+    /**
+     * @returns {Boolean} - Whether or not the Timer can be collected from
+     */
+    get isReady(){
+        return Boolean(this._collectFlag);
+    }
+
+    /**
+     * @returns {Boolean} - Whether or not the Timer is frozen
+     */
+    get isFrozen(){
+        return Boolean(this._frozen);
+    }
+
+    /**
+     * Resets the Timer's current state (unfreezes, clears ready, clears cycles)
+     * If now is provided, startTime will be set to it; otherwise, now will be called
+     * @param {Number} _now - performance.now
+     */
+    reset(_now){
+        if(typeof _now === "undefined") _now = now();
+        // Calling freeze to make sure nothing happens
+        this.freeze();
+        // Clear Cycles
+        this.cycles = 0;
+        // Clear Ready
+        this.clearReady();
+        // Update startTime
+        this.startTime = _now;
+        // Unfreeze; since preserve was undefined, no offset will be used
+        this.unfreeze();
+    }
+
+    /**
+     * A function just because we should touch internal variables
+     * (and, potentially, the timer may want to do other things when
+     * it is no longer ready)
+     */
+    clearReady(){
+        this._collectFlag = false;
+    }
+
+    /**
+     * Freezes the Timer at the current time offset.
+     * Frozen Timers must call unfreeze in order to properly resume functionality
+     * @param {Number} now - the runtime ms when the Timer is Frozen
+     * @param {Boolean} preserve - Whether or not to preserve the offsetTime; false is
+     *                              the default in which case offsetTime is not stored
+     */
+    freeze(now, preserve){
+        // Have to use -1 for _frozen because we simply call Boolean for isFrozen()
+        if(!preserve || typeof preserve == "undefined") {this._frozen = -1;}
+        else {this._frozen = this.getOffsetTime(now);}
+    }
+
+    /**
+     * Unfreezes the Timer so it can continue operation
+     * @param {Number} _now - the runtime ms when the Timer is UnFrozen
+     */
+    unfreeze(_now){
+        if(typeof _now === "undefined") _now = now();
+        // To unfreeze a timer, we need to start it counting from now()
+        // so we use setOffsetTime to set an oppropriate startTime
+        // If _frozen is -1 that indicates that we should offset by 0;
+        this.setOffsetTime(_now, this._frozen == -1 ? 0 : this._frozen);
+
+        // Set _frozen to null so it no longer isFrozen
+        this._frozen = null;
+    }
+
+    /**
+     * Updates how many cycles the Meeple has completed for its current job
+     * If the number is incremented, then collectFlag is set to true
+     * @param {Number} now - performance.now
+     */
+     updateCycles(now){
+        // Frozen Timers do not update their cycles
+        if(this.isFrozen) return;
+        
+        // How many Cycles the Timer has completed
+        let cycles = Math.floor((now - this.startTime) / this.rate);
+        // The Meeple has completed one or more Job Cycles since the last time
+        // it was updated
+        if(cycles > this.cycles){
+            // Set Meeple to be collected from
+            /**
+             * DEVNOTE- There is no reason at the moment for this._collectFlag
+             *      to ever be more than 1 (updateLoops should be running faster
+             *      than Timers), but just incase that changes, we'll set it to
+             *      the difference instead of just true.
+             */
+            this._collectFlag = cycles - this.cycles;
+
+            // Update cycles
+            this.cycles = cycles;
+        }
+    }
+
+        /**
+     * DEVNOTE - Saving Timers
+     * 
+     * To save Meeple's Job State, we're just saving how long they've
+     * been doing the current cycle of their current job.
+     * 
+     * Resources should be collected from Meeple before saving.
+     * 
+     * When we load, we offset the Meeple's jobStart value by that value.
+     * 
+     * We do not save cycles because we only track them in order to
+     * avoid constantly resetting jobStart.
+     * 
+     * We are using the same exact sytem for Hunger
+     * 
+     * Example:
+     *      Alice the Meeple has been Charging Batteries since 1000ms
+     *      Charging Batteries takes 800ms
+     *      It is now(): 3512ms
+     *      We want to save the gamestate, so we call getOffsetTime on all Meeple
+     *      Alice has been Charging Batteries for (3512 - 1000) = 2512ms
+     *      Alice has charged (2512 / 800) = 3.14 Batteries
+     *      We don't want to lose that .14 of a Battery, so we use (2512 % 800)
+     *          to get the number of ms that have been done on that battery (112ms)
+     *      When we load the game back up, Alice is recreated at 500ms.
+     *      In order to get those 112ms back, we set her jobStart to
+     *          (500 - 112) = 388ms; now, she will finish her first Battery in this
+     *          game at 1188ms instead of (500+800) = 1300ms.
+     */
+
+    /**
+     * Returns the modulo'd difference between now and the given startTime.
+     * See above note for more information
+     * If the Timer isFrozen, returns this._frozen instead (as the getOffsetTime
+     *  is already calculated)
+     * @param {Number} now - performance.now time: unlike other functions, this
+     *                      is not optional because getOffsetTime should be called
+     *                      using the same now() for all Meeple
+     * @returns {Number} - The modulo'd difference in time
+     */
+     getOffsetTime(now){
+        if(this.isFrozen) return this._frozen;
+        return (now - this.startTime)   // (now - jS) is how long the timer has been performed for
+                % this.rate;            // the modulus gets how much time the current
+                                        // cycle has been running
+        
+    }
+
+    /**
+     * Sets the startTime to offset-ms before now.
+     * In an attempt to preempt exploits, offset is modulo'd by rate
+     * @param {Number} now - performance.now time when all timers are created
+     * @param {Number} offset - Amount to offset the startTime by
+     */
+    setOffsetTime(now, offset){
+        // This timer started offset-ms before now()
+        // We're modulo'ing offset so that a timer can never be loaded with a completed cycle
+        // We also offset by number of cycles
+        this.startTime = now - (offset % this.rate) - (this.cycles * this.rate);
     }
 }

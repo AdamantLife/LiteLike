@@ -4,18 +4,24 @@
             "damage": 1,
             "cooldown": 1000,
             "warmup": null,
-            "range": 0
+            "range": 0,
+            "shopPrerequisites":[],
+            "shopCost":[]
         },
         { 
             "damage": 2,
             "cooldown": 1000,
             "warmup": 1000,
-            "range": 1
+            "range": 1,
+            "shopPrerequisites":[],
+            "shopCost":[]
         }
     ],
     "armor":[
         {
-            "value": 0
+            "value": 0,
+            "shopPrerequisites":"undefined",
+            "shopCost":[]
         }
     ],
     "item":[
@@ -24,25 +30,46 @@
             "callback":"HEAL",
             "arguments":["ACTIVATOR",45],
             "isConsumable":true,
-            "cooldown":1000
+            "cooldown":1000,
+            "shopPrerequisites":[],
+            "shopCost":[]
         }
     ],
     "resource":[
-        { "weight": 1},
-        { "weight": 1 }
+        {
+            "weight": 1,
+            "shopPrerequisites":[],
+            "shopCost":[]
+        },
+        {
+            "weight": 1,
+            "shopPrerequisites":[],
+            "shopCost":[]
+        },
+        {
+            "weight": 1,
+            "shopPrerequisites":[],
+            "shopCost":[]
+        }
     ],
     "transport":[
         {
             "reactorPower":10,
-            "capacity":10
+            "capacity":10,
+            "shopPrerequisites":"undefined",
+            "shopCost":[]
         },
         {
             "reactorPower":15,
-            "capacity":15
+            "capacity":15,
+            "shopPrerequisites":[],
+            "shopCost":[]
         },
         {
             "reactorPower":20,
-            "capacity":20
+            "capacity":20,
+            "shopPrerequisites":[],
+            "shopCost":[]
         }
     ]
 }

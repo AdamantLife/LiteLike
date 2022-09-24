@@ -13,6 +13,8 @@ export const weaponstates = UTILS.enumerate(
     "READY" // The Weapon is off of cooldown and off of warmup
     );
 
+/** TODO: Update Cooldowns to Timers */
+
 /**
  * A superclass for stackable items (items with quantities) and have weight
  */
@@ -33,9 +35,24 @@ class Stackable {
 }
 
 /**
+ * A Supperclass for *Types which can be purchased in the shop
+ */
+class ShopItem {
+    /**
+     * 
+     * @param {Symbol[] | undefined} shopPrerequisites - Unlocks required to purchase from shop
+     * @param {Resource[]} shopCost - Cost to 
+     */
+    constructor(shopPrerequisites, shopCost){
+        this.shopPrerequisites = shopPrerequisites;
+        this.shopCost = shopCost;
+    }
+}
+
+/**
  * A class for describing attack options
  */
-export class WeaponType{
+export class WeaponType extends ShopItem{
     /**
      * 
      * @param {Number} id - An integer
@@ -48,6 +65,7 @@ export class WeaponType{
      * @param {Number} weight - how much a single qty weighs (contributes to the Transport's Capacity)
      */
     constructor(id, damage, cooldown, warmup, range, weight){
+        super();
         this.id = id;
         this.damage = damage;
         this.cooldown = cooldown;
@@ -182,13 +200,14 @@ export class Weapon {
  * if this changes in the future we can split armor into ArmorType/Armor
  * like with Weapons
  */
-export class Armor {
+export class Armor extends ShopItem{
 
     /**
      * @param {Number} id - an unique integer
      * @param {Number} value - Amount of damage the armor prevents
      */
     constructor(id, value){
+        super();
         this.id = id;
         this.value = value;
     }
@@ -201,7 +220,7 @@ const targets = UTILS.enumerate("SELF", "ENEMY");
 /**
  * Base class for Items
  */
-export class ItemType{
+export class ItemType extends ShopItem{
 
     /**
      * DEVNOTE- In a more-complex game isConsumable would be "maxUses", but A Dark Room
@@ -219,6 +238,7 @@ export class ItemType{
      * @param {Number} weight - how much a single qty weighs (contributes to the Transport's Capacity)
      */
     constructor(id, target, callback, isConsumable, cooldown, weight){
+        super();
         this.id = id;
         this.target = target;
         this.callback = callback;
@@ -252,13 +272,14 @@ export class Item extends Stackable{
 /**
  * Base class for Resources
  */
-export class ResourceType{
+export class ResourceType extends ShopItem{
     /**
      * 
      * @param {Number} id - A unique identifier for this ResourceType
      * @param {Number} weight - The weight per resourceType
      */
     constructor(id, weight){
+        super();
         this.id = id;
         this.weight = weight;
     }
@@ -285,7 +306,7 @@ export class Resource extends Stackable{
  *      - reactorPower => Water (maxReactorPower)
  *      - capacity => capacity
  */
-export class Transport{
+export class Transport extends ShopItem{
     /**
      * 
      * @param {Number} id - A Unique identifier
@@ -294,6 +315,7 @@ export class Transport{
      * @param {Number} capacity - The amount weight (for items and weapons)
      */
     constructor(id, reactorPower, maxReactorPower, capacity){
+        super();
         this.id = id;
         this.reactorPower = reactorPower;
         this.maxReactorPower = maxReactorPower;

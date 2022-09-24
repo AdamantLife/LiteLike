@@ -67,16 +67,16 @@ function residential(sector, colony, random){
  * at each level of the ScoutBot Sector
  */
 const SCOUTBOTTABLE = {
-    1:[[0,3]],
-    2:[[0,5]],
-    3:[[0,7]],
-    4:[[0,9]],
-    5:[[0,11]],
-    6:[[0,13]],
-    7:[[0,15]],
-    8:[[0,17]],
-    9:[[0,19]],
-    10:[[0,21]]
+    1:[[0,3], [2, 3]],
+    2:[[0,5], [2, 5]],
+    3:[[0,7], [2, 7]],
+    4:[[0,9], [2, 9]],
+    5:[[0,11], [2, 11]],
+    6:[[0,13], [2, 13]],
+    7:[[0,15], [2, 15]],
+    8:[[0,17], [2, 17]],
+    9:[[0,19], [2, 19]],
+    10:[[0,21], [2, 21]]
 }
 
 /**
@@ -95,7 +95,7 @@ function scoutbots(sector, colony, random){
     // Generate resources for each sector level
     for(let i = 0; i < sector.level; i++){
         // The level to get the resource from (max of sector.level)
-        let rewardlevel = Math.floor(random() * sector.level);
+        let rewardlevel = Math.floor(random() * sector.level)+1;
         // Pull a random reward from the level
         let [resource, qty] = UTILS.randomChoice(SCOUTBOTTABLE[rewardlevel], random);
 
@@ -114,4 +114,15 @@ function scoutbots(sector, colony, random){
     colony.triggerEvent(COLONY.TheColony.EVENTTYPES.resourcesmodified, {resourcechange: resources});
 }
 
-export const sectorCallbacks = Object.freeze({ RESIDENTIAL: residential, SCOUTBOTS: scoutbots});
+/**
+ * 
+ * @param {COLONY.Sector} sector - The Residential Sector
+ * @param {COLONY.TheColony} colony - The Colony 
+ * @param {seedrandom} random - The Game instance's seedrandom
+ */
+function agriculture(sector, colony, random){
+    // Agriculture produces enough food per level to feed one level of Residential
+    colony.addResource(0, COLONY.RESIDENTIALMEEPLE * sector.level);
+}
+
+export const sectorCallbacks = Object.freeze({ RESIDENTIAL: residential, SCOUTBOTS: scoutbots, AGRICULTURE: agriculture});

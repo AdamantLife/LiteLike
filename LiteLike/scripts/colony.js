@@ -1,4 +1,5 @@
 import * as UTILS from "./utils.js";
+import {Timer} from "./utils.js";
 import { sectorCallbacks } from "./callbacks.js";
 
 // NOTE: powerLevel is our analog for "strength of the fire" in A Dark Room
@@ -86,6 +87,57 @@ export class TheColony extends UTILS.EventListener{
     }
 
     /**
+     * Attempts to coerce the unlock flag into a valid unlock Symbol and returns
+     *  whether or not The Colony has the given unlock
+     * @param {Symbol | String} unlock - The unlock to validate
+     * @returns {Array} - a length-2 array containing the conversion of the unlock
+     *          (undefined if not a valid symbol) and a boolean indicating whether
+     *          The Colony has the unlock
+     */
+    validateUnlock(unlock){
+         // Make sure prereq is Symbol
+         if(typeof unlock !== "symbol") unlock = unlocks[unlock];
+
+         // Return whether the unlock is in in our unlock list
+         return [unlock, this.unlocks.indexOf(unlock) >= 0];
+    }
+
+    /**
+     * Checks whether The Colony has the given unlocks, returning any it does not have
+     * @param {Symbol[] | String[]} unlocks - A list of unlocks to check
+     * @returns {Symbol[]}- A list of unlocks that The Colony does not have
+     */
+    checkUnlocks(unlocks){
+        // Make sure we have all the unlocks
+        let nounlocks = [];
+        let result;
+        for (let unlock of unlocks){
+            [unlock, result] = this.validateUnlock(unlock);
+            if(!result) nounlocks.push(unlock);
+        }
+        return nounlocks;
+    }
+
+    /**
+     * Returns an array containing any resources in the given cost that The Colony cannot afford
+     * @param {Array[]} cost - An array of length-2 arrays representing resources and quantities
+     * @returns {Array[]} - Any of the cost entries which The Colony cannot afford
+     */
+    checkCost(cost){
+        let noresources = [];
+        // Check that we can afford the upgrade
+        for(let [res, qty] of cost){
+            // If we have enough resources, continue
+            if(this.resources[res]
+                && typeof this.resources[res] !== "undefined"
+                && this.resources[res] >= qty) continue;
+            // We don't have enough resources, so log it
+            noresources[res] = qty;
+        }
+        return noresources;
+    }
+
+    /**
      * Adds the given quantity of the supplied resource this The Colony's inventory
      * @param {ResourceType|Resource|Number} resource - The resource to be added or it's id
      * @param {Number|undefined} qty - The amount to be added to the inventory. If
@@ -123,21 +175,14 @@ export class TheColony extends UTILS.EventListener{
      * @param {Symbol} flag - The unlock Symbol to add
      */
     unlock(flag){
-        // If flag is not a Symbol, try to convert it
         if(typeof flag !== "symbol") flag = unlocks[flag];
-
-        // Make sure flag is a valid unlock Symbol
-        // If not, as with other places in the code, we'll just ignore it
-        if(Object.values(unlocks).indexOf(flag) < 0) return;
-
-        // If we already have the given unlock, ignore it
-        if(this.unlocks.indexOf(flag) >= 0) return;
+        if(typeof flag === "undefined") return;
 
         // Flag is valid, so add it
         this.unlocks.push(flag);
         
         // Notify listeners that we have a new unlock
-        this.triggerEvent(TheColony.EVENTTYPES.unlockadded, {unlock});
+        this.triggerEvent(TheColony.EVENTTYPES.unlockadded, {unlock: flag});
     }
 
 
@@ -171,17 +216,10 @@ export class TheColony extends UTILS.EventListener{
             if(sect.sectorType == sector.sectorType) return;
         }
 
-        let nounlock = [];
-        // Make sure The Colony meets all prerequisites to add the Sector
-        for(let prereq of sector.prerequisites){
-            // We have the prerequisite unlocked, so continue
-            if(this.unlocks.indexOf(prereq) > 0) continue;
-            // Otherwise, log the missing prereq
-            nounlock.push(prereq);
-        }
-
+        let nounlocks = this.checkUnlocks(sector.prerequisites)
+        console.log(this.unlocks, nounlocks);
         // nounlock.length > 0 means we are missing prereqs, so trigger and return
-        if(nounlock.length) return this.triggerEvent(TheColony.EVENTTYPES.nounlock, {sector, nounlock});
+        if(nounlocks.length) return this.triggerEvent(TheColony.EVENTTYPES.nounlock, {sector, nounlocks});
 
         // We meet all prerequisites, so add Sector
         this.sectors.push(sector);
@@ -280,21 +318,10 @@ export class TheColony extends UTILS.EventListener{
         for(let meeple of this.meeples){
             // Meeple has completed a job since last cycle
             if(meeple.jobTimer.isReady){
-                canCollect = true;
-                for(let [resource, qty] of meeple.job.resourcesRequired){
-
-                    if(this.resources[resource.id]                                  // We have an entry at that resource id
-                        && typeof this.resources[resource.id] !== "undefined"       // It is not undefined
-                        && this.resources[resource.id] >= qty) continue;   // We have enough of the resource, so don't worry
-                    
-                    // We don't have the resource or don't have enough of it
-                    // so flag the collection and stop checking other resources
-                    canCollect = false;
-                    break;
-                }
+                let cantCollect = this.checkCost(meeple.job.resourcesRequired);
 
                 // We can't collect, so freeze the timer
-                if(!canCollect){
+                if(cantCollect.length){
                     meeple.jobTimer.freeze(now);
                 } else{
                     // Collect from Job
@@ -366,7 +393,14 @@ export class TheColony extends UTILS.EventListener{
         // Trigger startsectorupdate Event
         this.triggerEvent(TheColony.EVENTTYPES.startsectorupdate, {now});
 
+
         for(let sector of this.sectors){
+            // We haven't powered this sector on yet
+            if(!sector.level) continue;
+
+            // Update timer
+            sector.timer.updateCycles(now);
+
             // Sector is not ready or is Frozen, so skip it
             if(!sector.timer.isReady || sector.timer.isFrozen) continue;
 
@@ -374,7 +408,7 @@ export class TheColony extends UTILS.EventListener{
             if(sector.sectorType === sectors.RESIDENTIAL){
                 // Call the Residential Sector's callback function
                 // It will handle everything that needs to be done
-                sectorCallbacks[sector.sectorType.toString()](sector, this, this.game.random);
+                sectorCallbacks[sector.sectorType.description](sector, this, this.game.random);
                 // Clear the Residential Sector's timer
                 sector.timer.clearReady();
             }
@@ -408,9 +442,54 @@ export class TheColony extends UTILS.EventListener{
         if(!sector.timer.isReady) return this.triggerEvent("badtimer", {target: sector});
 
         // Sector is ready, so call 
-        sectorCallbacks[sector.sectorType](sector, this, this.game.random);
+        sectorCallbacks[sector.sectorType.description](sector, this, this.game.random);
+
+        // Clear timer
+        sector.timer.clearReady();
+
         // NOTE- Normally, all sectors should be frozen
-        if(sector.timer.isFrozen) sector.unfreeze();
+        if(sector.timer.isFrozen) sector.timer.unfreeze();
+    }
+
+    /**
+     * @returns {Object[]} - A list of items (objects from items.js) available for purchase in the shop
+     * Returns an array of available shop items
+     */
+    shopItems(){
+        let g = this.game;
+        let items = [];
+        // Go through all the items looking for available items
+        for(let item of [...g.ITEMS.items, ...g.ITEMS.armor, ...g.ITEMS.weapons, ...g.ITEMS.transports, ...g.ITEMS.resources]){
+            // Item can never be bought in the Shop
+            if(item.shopPrerequisites === "undefined") continue;
+            console.log(item.shopPrerequisites)
+
+            // Make sure the Colony has all the prerequisites
+            let unlocked = true;
+            for(let unlock of item.shopPrerequisites){
+                let result;
+                [unlock,result] = this.validateUnlock(unlock);
+
+                // If we don't have the unlock, set the unlocked flag false
+                if(!result) unlocked = false;
+            }
+            if(unlocked) items.push(item);
+        }
+
+        return items;
+    }
+
+    /**
+     * Adds an item to the PlayerCharacter if TheColony can buy the item
+     * @param {Object} item - the item (object from items.js) to be purchased
+     */
+    purchaseItem(item){
+        let nounlocks = this.checkUnlocks(item.shopPrerequisites);
+        if(nounlocks.length) return this.triggerEvent(TheColony.EVENTTYPES.nounlocks, {item, nounlocks});
+
+        let noresources = this.checkCost(item.shopCost);
+        if(noresources.length) return this.triggerEvent(TheColony.EVENTTYPES.noresources, {item, noresources});
+
     }
 }
 
@@ -460,181 +539,6 @@ class Meeple{
         this.hungerTimer.updateCycles(now);
     }
 
-}
-
-class Timer {
-    /**
-     * 
-     * @param {Number} startTime - performance.now
-     * @param {Number} rate - The time that elapses between cycles
-     */
-    constructor(startTime, rate){
-        this.startTime = startTime;
-        this.rate = rate;
-
-        this._frozen = null;
-
-        this.cycles = 0;
-        this._collectFlag = false;
-    }
-    
-
-    /**
-     * @returns {Boolean} - Whether or not the Timer can be collected from
-     */
-    get isReady(){
-        return Boolean(this._collectFlag);
-    }
-
-    /**
-     * @returns {Boolean} - Whether or not the Timer is frozen
-     */
-    get isFrozen(){
-        return Boolean(this._frozen);
-    }
-
-    /**
-     * Resets the Timer's current state (unfreezes, clears ready, clears cycles)
-     * If now is provided, startTime will be set to it; otherwise, utils.now will be called
-     * @param {Number} now - performance.now
-     */
-    reset(now){
-        if(typeof now === "undefined") now = UTILS.now();
-        // Calling freeze to make sure nothing happens
-        this.freeze();
-        // Clear Cycles
-        this.cycles = 0;
-        // Clear Ready
-        this.clearReady();
-        // Update startTime
-        this.startTime = now;
-        // Unfreeze; since preserve was undefined, no offset will be used
-        this.unfreeze();
-    }
-
-    /**
-     * A function just because we should touch internal variables
-     * (and, potentially, the timer may want to do other things when
-     * it is no longer ready)
-     */
-    clearReady(){
-        this._collectFlag = false;
-    }
-
-    /**
-     * Freezes the Timer at the current time offset.
-     * Frozen Timers must call unfreeze in order to properly resume functionality
-     * @param {Number} now - the runtime ms when the Timer is Frozen
-     * @param {Boolean} preserve - Whether or not to preserve the offsetTime; false is
-     *                              the default in which case offsetTime is not stored
-     */
-    freeze(now, preserve){
-        // Have to use -1 for _frozen because we simply call Boolean for isFrozen()
-        if(!preserve || typeof preserve == "undefined") {this._frozen = -1;}
-        else {this._frozen = this.getOffsetTime(now);}
-    }
-
-    /**
-     * Unfreezes the Timer so it can continue operation
-     * @param {Number} now - the runtime ms when the Timer is UnFrozen
-     */
-    unfreeze(now){
-        // To unfreeze a timer, we need to start it counting from now()
-        // so we use setOffsetTime to set an oppropriate startTime
-        // If _frozen is -1 that indicates that we should offset by 0;
-        this.setOffsetTime(now, this._frozen == -1 ? 0 : this._frozen);
-
-        // Set _frozen to null so it no longer isFrozen
-        this._frozen = null;
-    }
-
-    /**
-     * Updates how many cycles the Meeple has completed for its current job
-     * If the number is incremented, then collectFlag is set to true
-     * @param {Number} now - performance.now
-     */
-     updateCycles(now){
-        // Frozen Timers do not update their cycles
-        if(this.isFrozen) return;
-        
-        // How many Cycles the Timer has completed
-        let cycles = Math.floor((now - this.startTime) / this.rate);
-        // The Meeple has completed one or more Job Cycles since the last time
-        // it was updated
-        if(cycles > this.cycles){
-            // Set Meeple to be collected from
-            /**
-             * DEVNOTE- There is no reason at the moment for this._collectFlag
-             *      to ever be more than 1 (updateLoops should be running faster
-             *      than Timers), but just incase that changes, we'll set it to
-             *      the difference instead of just true.
-             */
-            this._collectFlag = cycles - this.cycles;
-
-            // Update cycles
-            this.cycles = cycles;
-        }
-    }
-
-        /**
-     * DEVNOTE - Saving Timers
-     * 
-     * To save Meeple's Job State, we're just saving how long they've
-     * been doing the current cycle of their current job.
-     * 
-     * Resources should be collected from Meeple before saving.
-     * 
-     * When we load, we offset the Meeple's jobStart value by that value.
-     * 
-     * We do not save cycles because we only track them in order to
-     * avoid constantly resetting jobStart.
-     * 
-     * We are using the same exact sytem for Hunger
-     * 
-     * Example:
-     *      Alice the Meeple has been Charging Batteries since 1000ms
-     *      Charging Batteries takes 800ms
-     *      It is now(): 3512ms
-     *      We want to save the gamestate, so we call getOffsetTime on all Meeple
-     *      Alice has been Charging Batteries for (3512 - 1000) = 2512ms
-     *      Alice has charged (2512 / 800) = 3.14 Batteries
-     *      We don't want to lose that .14 of a Battery, so we use (2512 % 800)
-     *          to get the number of ms that have been done on that battery (112ms)
-     *      When we load the game back up, Alice is recreated at 500ms.
-     *      In order to get those 112ms back, we set her jobStart to
-     *          (500 - 112) = 388ms; now, she will finish her first Battery in this
-     *          game at 1188ms instead of (500+800) = 1300ms.
-     */
-
-    /**
-     * Returns the modulo'd difference between now and the given startTime.
-     * See above note for more information
-     * If the Timer isFrozen, returns this._frozen instead (as the getOffsetTime
-     *  is already calculated)
-     * @param {Number} now - performance.now time: unlike other functions, this
-     *                      is not optional because getOffsetTime should be called
-     *                      using the same now() for all Meeple
-     * @returns {Number} - The modulo'd difference in time
-     */
-     getOffsetTime(now){
-        if(this.isFrozen) return this._frozen;
-        return (now - this.startTime)   // (now - jS) is how long the timer has been performed for
-                % this.rate;            // the modulus gets how much time the current
-                                        // cycle has been running
-        
-    }
-
-    /**
-     * Sets the startTime to offset-ms before now.
-     * In an attempt to preempt exploits, offset is modulo'd by rate
-     * @param {Number} now - performance.now time when all timers are created
-     * @param {Number} offset - Amount to offset the startTime by
-     */
-    setOffsetTime(now, offset){
-        // This timer started offset-ms before now()
-        // We're modulo'ing offset so that a timer can never be loaded with a completed cycle
-        this.startTime = now - (offset % this.rate);
-    }
 }
 
 export class Job{
@@ -722,35 +626,27 @@ export class Sector {
         if(this.level >= this.maxlevel) return;
 
         // Get cost
-        cost = this.calculateResourceRequirements();
+        let cost = this.calculateResourceRequirements();
 
-        // We're going to be calling colony.resources a lot
-        let resources = colony.resources;
-
-        let noresources = [];
-        // Check that we can afford the upgrade
-        for(let [res, qty] of cost){
-            // If we have enough resources, continue
-            if(resources[res]
-                && typeof resources[res] === "undefined"
-                && resources[res] >= qty) continue;
-            // We don't have enough resources, so log it
-            noresources[res] = qty;
-        }
+        let noresources = colony.checkCost(cost);
 
         // If length of noresources > 0, we are missing resources, so trigger and return
         if(noresources.length) return colony.triggerEvent(TheColony.EVENTTYPES.noresources, {sector:this, noresources});
 
         // Subtract the resources
         for(let [res,qty] of cost){
-            resources[res] -= qty;
+            colony.resources[res] -= qty;
         }
 
         // Level Up
         this.level += 1;
         
-        // If this is our first level, set any flags
-        if(this.level == 1) this.setFlags();
+        // If this is our first level, set any flags and start Timer
+        if(this.level == 1){
+            this.setFlags();
+            this.newTimer();
+        }
+
 
         // Signal that we have upgraded
         colony.triggerEvent(TheColony.EVENTTYPES.sectorexpanded, {sector: this});

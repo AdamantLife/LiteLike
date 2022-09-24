@@ -3,7 +3,7 @@
 import {toggleAllButtons, clearDemoBox} from "./utils.js";
 import * as IO from "../scripts/io.js";
 import * as UTILS from "../scripts/utils.js";
-import {HUNGERRATE, Sector} from "../scripts/colony.js";
+import {HUNGERRATE, Sector, unlocks} from "../scripts/colony.js";
 
 export function colonyDemo(){
     // Disable all buttons to avoid shenanigans
@@ -12,6 +12,10 @@ export function colonyDemo(){
 
     // Create a new TheColony
     GAME.COLONY = GAME.initializeColony();
+
+
+    // For the Demo, give the Colony 20 Scrap (hopefully they unlock scoutbots)
+    GAME.COLONY.resources[2] = 20;
 
     // Getting a reference to the DemoBox
     let demoBox = document.getElementById("demoBox");
@@ -51,7 +55,7 @@ export function colonyDemo(){
         let qty;
         // Iterate over the noresources attribute
         for (let i = 0; i < event.noresources.length; i++){
-            qty = event.noresources[qty];
+            qty = event.noresources[i];
             // Resource Lists may have blank spaces (and we can't be missing qty 0 resources)
             if(!qty || typeof qty === "undefined") continue;
             // Add resource to the list
@@ -61,7 +65,7 @@ export function colonyDemo(){
         // For each missing resource
         for(let resource of resources){
             // Get the row for the research and start an animation
-            resourceBody.querySelector(`tr[data-id="${resource}"]`).animate([{text:"red",text:"unset"}], {duration: 500, iterations: 3});
+            resourceBody.querySelector(`tr[data-id="${resource}"]`).animate([{color:"#f00", easing: "ease-in"},{color:"unset", easing:"ease-out"}], {duration: 500, iterations: 3});
         }
         
     }
@@ -101,6 +105,15 @@ export function colonyDemo(){
         if(!now || typeof now === "undefined") now = UTILS.now();
         // Use the builtin function to create and get a reference to a new meeple
         let meeple = GAME.COLONY.addNewMeeple(now);
+        addMeepleToGUI(meeple);
+    }
+
+    /**
+     * Adds the meeple to the GUI and gives it an identifier.
+     * Used by both addMeeple and residentialUpdate
+     * @param {Meeple} meeple - The meeple to be added
+     */
+    function addMeepleToGUI(meeple){
         // Meeple normally don't have ID's, so we're supplying them with one
         meeple.id = meepleindex;
         // Increment index for next meeple
@@ -139,7 +152,7 @@ export function colonyDemo(){
     demoBox.insertAdjacentHTML("beforeend", `<div id="sectorBox"><h3>Sectors</h3><table id="sectorTable"><thead><tr><th></th><th>Level</th><th>Progress</th></tr></thead><tbody></tbody></table></div>`);
 
     // Give The Colony all unlocks
-    for(let unlock of GAME.COLONY.unlocks){
+    for(let unlock of Object.values(unlocks)){
         GAME.COLONY.unlock(unlock);
     }
 
@@ -149,8 +162,6 @@ export function colonyDemo(){
     // Give The Colony all sectors (They should be level 0)
     for(let sector of GAME.SECTORS){
         GAME.COLONY.addSector(sector)
-        // Reset the Sector's timer
-        sector.newTimer();
         // And cache the strings
         sectorStrings[sector.sectorType] = IO.getStrings(GAME.STRINGS, sector);
     }
@@ -168,7 +179,7 @@ export function colonyDemo(){
         let costString = "Requires:";
         for(let [resource, qty] of requirements){
             costString += `
-  ${resourcestrings[resource]}: ${qty}`;
+  ${resourcestrings[resource].name}: ${qty}`;
         }
         return costString
     }
@@ -183,12 +194,12 @@ export function colonyDemo(){
         let costString = constructSectorLevelCost(sector.calculateResourceRequirements());
         
         // Create HTML
-        sectorBody.insertAdjacentHTML("beforeend", `<tr data-type="${sector.sectorType.toString()}"><td data-name><button title="${costString}">Power ${strings.name}</button></td><td>${sector.level}</td><td><div data-timer><span data-timer>0</span>/${sector.collectionTime}</div><div data-collection style="display:none;"><button>Collect</button></div></td></tr>`);
+        sectorBody.insertAdjacentHTML("beforeend", `<tr data-type="${sector.sectorType.description}"><td data-name><button title="${costString}">Power ${strings.name}</button></td><td data-level>${sector.level}</td><td><div data-timer><span data-timer>0</span>/${sector.collectionTime}</div><div data-collection style="display:none;"><button>Collect</button></div></td></tr>`);
 
         // Attach callbacks to buttons
         let lastrow = sectorBody.lastElementChild;
         lastrow.querySelector(`td[data-name]>button`).onclick = (e)=> sector.raiseLevel(GAME.COLONY);
-        lastrow.querySelector(`td>div[data-collection]>button`).onclick = (e)=>GAME.COLONY.collectSector(sector);
+        lastrow.querySelector(`td>div[data-collection]>button`).onclick = (e)=>GAME.COLONY.triggerSector(sector);
     }
 
     /**
@@ -197,19 +208,21 @@ export function colonyDemo(){
      */
     function updateSector(event){
         let sector = event.sector
-        let row = sectorBody.querySelector(`tr[data-type="${sector.sectorType}"]`);
+        let row = sectorBody.querySelector(`tr[data-type="${sector.sectorType.description}"]`);
+
+        // Update the Sector's Level
+        row.querySelector("td[data-level]").textContent = sector.level;
 
         // Update Upgrade Button
         let button = row.querySelector(`td[data-name]>button`)
         // Sector just powered on and it has more than 1 level
         if(sector.level == 1 && sector.maxLevel > 1){
             // Change text to say "Expand"
-            button.textContent = `Expand ${sectorStrings[sector.sectorType]}`;
+            button.textContent = `Expand ${sectorStrings[sector.sectorType].name}`;
             // Change the cost to upgrade
             button.title = constructSectorLevelCost(sector.calculateResourceRequirements());
         }
-        
-        else{ // Sector Max Level
+        else if (sector.level >= sector.maxLevel){ // Sector Max Level
             // Change button text
             button.textContent = "Fully Expanded";
             // Change the cost to be blank
@@ -217,10 +230,33 @@ export function colonyDemo(){
             // Disable Button
             button.disabled = true;
         } 
+        else{ // Sector only needs cost updated
+            button.title = constructSectorLevelCost(sector.calculateResourceRequirements());
+        }
     }
+
+    /**
+     * When the Residential Sector produces more Meeple, add them to the GUI
+     * @param {Event} event - meeplemodified event
+     */
+    function residentialUpdate(event){
+        // Make sure event is add meeple and not dead meeple
+        if(!event.newmeeple || typeof event.newmeeple === "undefined") return;
+
+        // Add each meeple to the GI
+        for(let meeple of event.newmeeple){
+            addMeepleToGUI(meeple);
+        }
+    }
+
     // Listen for callbacks to provide player feedback
     GAME.COLONY.addEventListener("noresources", flashResources);
     GAME.COLONY.addEventListener("sectorexpanded", updateSector);
+    // The Residential Sector will create new Meeple
+    GAME.COLONY.addEventListener("meeplemodified", residentialUpdate);
+
+    /** SHOP SETUP */
+    console.log(GAME.COLONY.shopItems());
 
     /** ADDITIONAL SETUP */
 
@@ -275,8 +311,10 @@ export function colonyDemo(){
         
         // Update Sector's timers
         for(let sector of GAME.COLONY.sectors){
-            let timer = sectorBody.querySelector(`tr[data-type="${sector.sectorType.toString()}"]>td>div[data-timer]`)
-            let collection = sectorBody.querySelector(`tr[data-type="${sector.sectorType.toString()}"]>td>div[data-collection]`)
+            // Sector is not powered yet
+            if(!sector.level) continue;
+            let timer = sectorBody.querySelector(`tr[data-type="${sector.sectorType.description}"]>td>div[data-timer]`)
+            let collection = sectorBody.querySelector(`tr[data-type="${sector.sectorType.description}"]>td>div[data-collection]`)
             // If timer is frozen, make sure Collect Button is showing and the Timer Div is hidden
             if(sector.timer.isFrozen){
                 timer.style.display = "none";
@@ -310,9 +348,9 @@ export function colonyDemo(){
     }
 
     // Button to add More Meeple
-    meepleBox.insertAdjacentHTML("beforeend", `<button id="addmeeple">Add Meeple</button>`);
+    demoBox.insertAdjacentHTML("beforeend", `<button id="addmeeple">Add Meeple</button>`);
     // Button to End the Demo
-    meepleBox.insertAdjacentHTML("beforeend", `<button id="quitmeeple">Quit Demo</button>`);
+    demoBox.insertAdjacentHTML("beforeend", `<button id="quitmeeple">Quit Demo</button>`);
 
     // Addmeeple expects a now() component, so we have to wrap it to get rid of the event
     document.getElementById("addmeeple").onclick = (e)=>addMeeple();
