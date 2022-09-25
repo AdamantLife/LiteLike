@@ -23,6 +23,10 @@
         {
             "name": "Basic Armor",
             "flavor": "The minimum armor required to survive interstellar radiation"
+        },
+        {
+            "name": "Bararium Armor",
+            "flavor": "Armor from a special alloy that raises the Bar on protection"
         }
     ],
     "item":[
@@ -43,6 +47,10 @@
         {
             "name": "Scrap",
             "flavor": "Reuse, Recycle... don't Reduce; we need every piece we can get"
+        },
+        {
+            "name": "Biomaterial",
+            "flavor": "Biological matter from living organisms that doesn't have any obvious use"
         }
     ],
     "transport":[

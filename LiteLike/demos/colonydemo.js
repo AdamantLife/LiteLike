@@ -13,6 +13,9 @@ export function colonyDemo(){
     // Create a new TheColony
     GAME.COLONY = GAME.initializeColony();
 
+    // Player needs to be initialized for Shopping
+    GAME.PLAYER = GAME.startingCharacter();
+
 
     // For the Demo, give the Colony 20 Scrap (hopefully they unlock scoutbots)
     GAME.COLONY.resources[2] = 20;
@@ -20,8 +23,13 @@ export function colonyDemo(){
     // Getting a reference to the DemoBox
     let demoBox = document.getElementById("demoBox");
 
+    demoBox.insertAdjacentHTML("beforeend", `<div class="flexcontainer" style="display:flex;"></div>`);
+    
+
+    /** RESOURCES SETUP */
+
     // Add a Table to display the Resources we've collected
-    demoBox.insertAdjacentHTML("beforeend", `<h3>Resources</h3><table id="resources"><tbody></tbody></table>`);
+    demoBox.lastElementChild.insertAdjacentHTML("beforeend", `<div style="width:25%;"><h3>Resources</h3><table id="resources"><tbody></tbody></table></div>`);
 
     // Get a reference to the Table Body to add items to it
     let resourceBody = document.querySelector("#resources>tbody");
@@ -70,10 +78,43 @@ export function colonyDemo(){
         
     }
 
+    /** PAGE SETUP
+     * 
+     * We're going to have a "multi-page" display on the right for each
+     * of the sub demos (Meeple, Sectors, Shop)
+    */
+
+    demoBox.lastChild.insertAdjacentHTML("beforeend", `<div style="margin:auto;"><div id="demopages" style="text-align:center;"></div><div id="demodisplay" style="margin-right:0px;"></div></div>`);
+
+    // Holds buttons to select page
+    let demoPages = document.getElementById("demopages");
+    // Holds the pages themselves
+    let demoDisplay = document.getElementById("demodisplay");
+
+    var CURRENTPAGE;
+
+    function setPage(button, page){
+        CURRENTPAGE = page;
+        // Reenable all buttons
+        for(let button of demoPages.children) button.disabled = false;
+        // Hide all pages
+        for(let div of demoDisplay.children) div.style.display = "none";
+        // Disable Button
+        button.disabled = true;
+        // Show correct page
+        document.getElementById(page).style.display = "block";
+    }
+
+    for(let name of ["meeple", "sector", "shop"]){
+        demoPages.insertAdjacentHTML("beforeend", `<button>${name.replace(/\b\w/g, chara=>chara.toUpperCase())}</button>`);
+        let button = demoPages.lastElementChild
+        button.onclick = ()=>setPage(button, name+"Box");
+    }
+
     /** MEEPLE SETUP */
 
     // Create the Meeple Box
-    demoBox.insertAdjacentHTML("beforeend", `<div id="meepleBox"></div>`);
+    demoDisplay.insertAdjacentHTML("beforeend", `<div id="meepleBox"></div>`);
 
     // Get a reference to the meepleBox for ease of use
     let meepleBox = document.getElementById("meepleBox");
@@ -86,7 +127,7 @@ export function colonyDemo(){
     }
 
     // Create a Table for Displaying Meeple
-    meepleBox.insertAdjacentHTML("beforeend", `<h3>Meeples</h3><table id="meeple"><thead><tr><th></th><th>Job</th><th>Hunger</th><th>Job</th></tr></thead><tbody></tbody>`);
+    meepleBox.insertAdjacentHTML("beforeend", `<h3 style="text-align:center;">Meeples</h3><table id="meeple"><thead><tr><th></th><th>Job</th><th>Hunger</th><th>Job</th></tr></thead><tbody></tbody>`);
 
     // Getting a reference to the Table's Body so we can add Meeple to it
     let meepleBody = document.querySelector("#meeple>tbody");
@@ -149,7 +190,7 @@ export function colonyDemo(){
 
     /** SECTOR SETUP  */
     // Setup Sector Box
-    demoBox.insertAdjacentHTML("beforeend", `<div id="sectorBox"><h3>Sectors</h3><table id="sectorTable"><thead><tr><th></th><th>Level</th><th>Progress</th></tr></thead><tbody></tbody></table></div>`);
+    demoDisplay.insertAdjacentHTML("beforeend", `<div id="sectorBox"><h3 style="text-align:center;">Sectors</h3><table id="sectorTable"><thead><tr><th></th><th>Level</th><th>Progress</th></tr></thead><tbody></tbody></table></div>`);
 
     // Give The Colony all unlocks
     for(let unlock of Object.values(unlocks)){
@@ -174,9 +215,10 @@ export function colonyDemo(){
      * @param {Array[]} requirements - An array of length-2 arrays containing resourceid and quantity
      * @returns {String} - The readable Resource Costs to level
      */
-    function constructSectorLevelCost(requirements){
+    function constructCost(requirements){
         // The output string starts with "Requires:" and then newline-concats each requirement
         let costString = "Requires:";
+        if(!requirements.length) return costString + " None";
         for(let [resource, qty] of requirements){
             costString += `
   ${resourcestrings[resource].name}: ${qty}`;
@@ -191,7 +233,7 @@ export function colonyDemo(){
         let strings = sectorStrings[sector.sectorType];
 
         // Hovering on the Level Up Button will show the current cost
-        let costString = constructSectorLevelCost(sector.calculateResourceRequirements());
+        let costString = constructCost(sector.calculateResourceRequirements());
         
         // Create HTML
         sectorBody.insertAdjacentHTML("beforeend", `<tr data-type="${sector.sectorType.description}"><td data-name><button title="${costString}">Power ${strings.name}</button></td><td data-level>${sector.level}</td><td><div data-timer><span data-timer>0</span>/${sector.collectionTime}</div><div data-collection style="display:none;"><button>Collect</button></div></td></tr>`);
@@ -220,7 +262,7 @@ export function colonyDemo(){
             // Change text to say "Expand"
             button.textContent = `Expand ${sectorStrings[sector.sectorType].name}`;
             // Change the cost to upgrade
-            button.title = constructSectorLevelCost(sector.calculateResourceRequirements());
+            button.title = constructCost(sector.calculateResourceRequirements());
         }
         else if (sector.level >= sector.maxLevel){ // Sector Max Level
             // Change button text
@@ -231,7 +273,7 @@ export function colonyDemo(){
             button.disabled = true;
         } 
         else{ // Sector only needs cost updated
-            button.title = constructSectorLevelCost(sector.calculateResourceRequirements());
+            button.title = constructCost(sector.calculateResourceRequirements());
         }
     }
 
@@ -256,7 +298,61 @@ export function colonyDemo(){
     GAME.COLONY.addEventListener("meeplemodified", residentialUpdate);
 
     /** SHOP SETUP */
-    console.log(GAME.COLONY.shopItems());
+
+    // Add shopBox
+    demoDisplay.insertAdjacentHTML("beforeend", `<div id="shopBox"></div>`);
+    // Get Reference to it
+    let shopBox = document.getElementById("shopBox");
+
+    // Populate shopBox
+    for(let [itemType, items] of Object.entries(GAME.COLONY.shopItems())){
+
+        // Create table for itemtype
+        shopBox.insertAdjacentHTML("beforeend", `<h3>${itemType}</h3><table><tbody id="shop${itemType}Body"></tbody></table>`);
+        // Get the tbody
+        let tbody = document.getElementById(`shop${itemType}Body`);
+
+        // Populate Table
+        for(let item of items){
+            // Get Readable strings
+            let strings = IO.getStrings(GAME.STRINGS, item);
+            // Add the Row
+            tbody.insertAdjacentHTML("beforeend", `<tr><td>${strings.name}</td><td><button data-buyitem title="${constructCost(item.shopCost)}">Buy</button></td></tr>`);
+
+            // Add callback for buy button
+            // For Armor and Transports, the Shop needs to be updated after the purchase
+            // Because purchasing doesn't happen too often (relatively speaking, in theory) we're
+            // going to just call the refresh function every time
+            tbody.lastElementChild.querySelector("button[data-buyitem]").onclick = ()=>updateShopItems(GAME.COLONY.purchaseItem(item));
+        }
+    }
+
+    /**
+     * Function to update Armor and Transport Availability in the Shop
+     * This function is necessary because the PlayerCharacter can only
+     *  have 1 Armor and 1 Transport at a time.
+     */
+    function updateShopItems(){
+        // Get available shop items
+        let items = GAME.COLONY.shopItems();
+        // Iterate over all the item types available
+        for(let itemType of ["Armor", "Transport"]){
+            // Table to populate
+            let tbody = document.getElementById(`shop${itemType}Body`);
+
+            // Clear the table
+            while(tbody.lastElementChild) tbody.lastElementChild.remove();
+            
+            // Add Items back in
+            for(let item of items[itemType]){
+                // Get Readable strings
+                let strings = IO.getStrings(GAME.STRINGS, item);
+
+                tbody.insertAdjacentHTML("beforeend", `<tr><td title="${strings.flavor}">${strings.name}</td><td><button data-buyitem title="${constructCost(item.shopCost)}">Buy</button></td></tr>`);
+                tbody.lastElementChild.querySelector("button[data-buyitem]").onclick = ()=>updateShopItems(GAME.COLONY.purchaseItem(item));
+            }
+        }
+    }    
 
     /** ADDITIONAL SETUP */
 
@@ -284,6 +380,22 @@ export function colonyDemo(){
             row.querySelector("td[data-quantity]").textContent = qty;
         }
 
+        // Update the currentlyDisplayed page
+        switch(CURRENTPAGE){
+            case "meepleBox":
+                updateMeeple(event);
+                break;
+            case "sectorBox":
+                updateSectors(event);
+                break;
+        }
+        
+    }
+
+    /**
+     * Updates the Meeple display (if it is currently on screen)
+     */
+    function updateMeeple(event){
         let meeples = GAME.COLONY.meeples;
 
         // Remove Dead meeple
@@ -308,7 +420,9 @@ export function colonyDemo(){
             // Get the Hunger Timer Cell for that row and update it
             row.querySelector(`span[data-timer="hunger"]`).textContent = meeple.hungerTimer.getOffsetTime(event.now).toFixed(3);
         }
-        
+    }
+
+    function updateSectors(event){
         // Update Sector's timers
         for(let sector of GAME.COLONY.sectors){
             // Sector is not powered yet
@@ -359,6 +473,10 @@ export function colonyDemo(){
     // Register for the endupdate event that fires at the end of each colonyLoop
     // and update the GUI at that time
     GAME.COLONY.addEventListener("endupdate", updateGUI);
+
+    // Make sure to only show the first page (meeple)
+    setPage(demoPages.children[0], "meepleBox");
+
 
     // Begin the Demo by starting the colonyLoop
     GAME.COLONY.colonyLoop();

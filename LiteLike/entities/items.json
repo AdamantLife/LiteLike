@@ -20,7 +20,12 @@
     "armor":[
         {
             "value": 0,
-            "shopPrerequisites":"undefined",
+            "shopPrerequisites":[],
+            "shopCost":[]
+        },
+        {
+            "value": 1,
+            "shopPrerequisites": [],
             "shopCost":[]
         }
     ],
@@ -36,7 +41,7 @@
         }
     ],
     "resource":[
-        {
+        { 
             "weight": 1,
             "shopPrerequisites":[],
             "shopCost":[]
@@ -44,19 +49,24 @@
         {
             "weight": 1,
             "shopPrerequisites":[],
-            "shopCost":[]
+            "shopCost":[[2,5]]
         },
         {
             "weight": 1,
             "shopPrerequisites":[],
-            "shopCost":[]
+            "shopCost":[[3,5]]
+        },
+        {
+            "weight": 1,
+            "shopPrerequisites":[],
+            "shopCost":[[1,30]]
         }
     ],
     "transport":[
         {
             "reactorPower":10,
             "capacity":10,
-            "shopPrerequisites":"undefined",
+            "shopPrerequisites":[],
             "shopCost":[]
         },
         {

@@ -171,7 +171,7 @@ export class EventListener{
         }
         for(let listener of this._listeners[eventtype]){
             let result = listener(event);
-            // TODO: consider cancelling combat via listener
+            // TODO: consider cancelling event via listener
         }
     }
 

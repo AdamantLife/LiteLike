@@ -1,4 +1,5 @@
 import * as UTILS from "./utils.js";
+import * as ITEMS from "./items.js";
 import {Timer} from "./utils.js";
 import { sectorCallbacks } from "./callbacks.js";
 
@@ -217,7 +218,6 @@ export class TheColony extends UTILS.EventListener{
         }
 
         let nounlocks = this.checkUnlocks(sector.prerequisites)
-        console.log(this.unlocks, nounlocks);
         // nounlock.length > 0 means we are missing prereqs, so trigger and return
         if(nounlocks.length) return this.triggerEvent(TheColony.EVENTTYPES.nounlock, {sector, nounlocks});
 
@@ -452,28 +452,32 @@ export class TheColony extends UTILS.EventListener{
     }
 
     /**
-     * @returns {Object[]} - A list of items (objects from items.js) available for purchase in the shop
-     * Returns an array of available shop items
+     * Returns available shop items
+     * 
+     * @returns {Object} - An Object with keys representing item types (from items.js) and
+     *      the value being arrays of those items which are available for purchase in the shop
      */
     shopItems(){
         let g = this.game;
-        let items = [];
+        let items = {};
         // Go through all the items looking for available items
         for(let item of [...g.ITEMS.items, ...g.ITEMS.armor, ...g.ITEMS.weapons, ...g.ITEMS.transports, ...g.ITEMS.resources]){
             // Item can never be bought in the Shop
-            if(item.shopPrerequisites === "undefined") continue;
-            console.log(item.shopPrerequisites)
+            if(item.shopPrerequisites === "undefined" || typeof item.shopPrerequisites === "undefined") continue;
 
             // Make sure the Colony has all the prerequisites
-            let unlocked = true;
-            for(let unlock of item.shopPrerequisites){
-                let result;
-                [unlock,result] = this.validateUnlock(unlock);
+            let unlocked = this.checkUnlocks(item.shopPrerequisites)
+            if(unlocked.length) continue;
 
-                // If we don't have the unlock, set the unlocked flag false
-                if(!result) unlocked = false;
-            }
-            if(unlocked) items.push(item);
+            // For Armor and Transports, the Player cannot buy duplicates
+            if(
+                (item.constructor.name == "Armor" && this.game.PLAYER.equipment.armor == item)
+                || (item.constructor.name == "Transport" && this.game.PLAYER.equipment.transport == item)) continue;
+            
+            // Make sure there is a place to put the item
+            if(!items[item.constructor.name] || typeof items[item.constructor.name] === "undefined") items[item.constructor.name] = [];
+            // Add the item to the output list for this type
+            items[item.constructor.name].push(item);
         }
 
         return items;
@@ -484,12 +488,61 @@ export class TheColony extends UTILS.EventListener{
      * @param {Object} item - the item (object from items.js) to be purchased
      */
     purchaseItem(item){
+        // Make sure we have all the unlocks
         let nounlocks = this.checkUnlocks(item.shopPrerequisites);
         if(nounlocks.length) return this.triggerEvent(TheColony.EVENTTYPES.nounlocks, {item, nounlocks});
 
+        // Make sure we can afford it
         let noresources = this.checkCost(item.shopCost);
         if(noresources.length) return this.triggerEvent(TheColony.EVENTTYPES.noresources, {item, noresources});
 
+        // Pay for it
+        for(let [res, qty] of item.shopCost){
+            this.resources[res] -= qty;
+        }
+
+        // Notify that we paid resources
+        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {cost: item.shopCost});
+
+        // If a generic item Types, convert to appropriate item instance
+        // Assume quantity of 1 for Items and Resources
+        switch(item.constructor.name){
+            case "WeaponType":
+                item = new ITEMS.Weapon(item);
+                break;
+            case "ItemType":
+                item = new ITEMS.Item(item, 1);
+                break;
+            case "ResourceType":
+                item = new ITEMS.Resource(item, 1);
+                break;
+        }
+        
+        // Put item in appropriate place
+        // Resources go to The Colony; everything else goes to PlayerCharacter
+        if(item.constructor.name === "Resource"){
+            this.addResource(item);
+            // Notify that we gained resources
+            this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: item});
+        }
+        else{
+            // NOTE: TODO: We probably want to trigger a equipmentchange event, in which case
+            // we may want to move this code to something like PLAYER.addEquipment
+            switch(item.constructor.name){
+                case "Weapon":
+                    this.game.PLAYER.equipment.weapons.push(item);
+                    break;
+                case "Armor":
+                    this.game.PLAYER.equipment.armor = item;
+                    break;
+                case "Item":
+                    this.game.PLAYER.equipment.items.push(item);
+                    break;
+                case "Transport":
+                    this.game.PLAYER.equipment.transport = item;
+                    break;
+            }
+        }
     }
 }
 
