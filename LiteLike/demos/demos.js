@@ -6,7 +6,7 @@ import { mapDemo } from "./mapdemo.js";
 
 var DEMOBUTTONS = {
     "startCombat": {text:"Start Combat Demo", target: combatDemo},
-    "startMeeple": {text:"Start Meeple Demo", target: colonyDemo},
+    "startColony": {text:"Start Colony Demo", target: colonyDemo},
     "startMap": {text: "Start Map Demo", target: mapDemo}
     };
 

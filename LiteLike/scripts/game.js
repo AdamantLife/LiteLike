@@ -2,8 +2,8 @@
 
 import {PlayerCharacter, roles} from "./character.js";
 import { TheColony } from "./colony.js";
+import {Map} from "./map.js";
 
-import * as MAP from "./map.js";
 import * as EVENTS from "./events.js";
 import * as IO from "./io.js";
 import * as EQUIP from "./items.js";
@@ -74,6 +74,11 @@ export class Game{
 
     initializeColony(){
         return new TheColony(this, 0);
+    }
+
+    newMap(seed, mask){
+        if(!seed || typeof seed === "undefined") seed = this.random();
+        return new Map(seed, mask, this.PLAYER);
     }
 }
 
