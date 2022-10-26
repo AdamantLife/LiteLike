@@ -17,9 +17,23 @@ const MOVEREPAIRCOST = 1/2;
 // This is the traditional rogue symbol
 const PLAYERSYMBOL = "@";
 
-const directions = UTILS.enumerate("NORTH","EAST","SOUTH","WEST");
+export const directions = UTILS.enumerate("NORTH","EAST","SOUTH","WEST");
 
+export const mapactions = UTILS.enumerate("MOVE");
 
+export class MapAction{
+    /**
+     * Initializes a new MapAction which can be added to Map.playerQueue
+     * @param {Symbol | String} action - a mapaction symbol or it's string
+     * @param {*} value - an appropriate value for the given action
+     */
+    constructor(action, value){
+        // this is a String: convert it to a Symbol
+        if(typeof mapactions[action] !== "undefined") action = mapactions[action];
+        this.action = action;
+        this.value = value;
+    }
+}
 
 /**
  * Object managing the map
@@ -27,7 +41,7 @@ const directions = UTILS.enumerate("NORTH","EAST","SOUTH","WEST");
 export class Map extends UTILS.EventListener{
     static EVENTTYPES = UTILS.enumerate(
         "loopstart", "loopend",
-        "movestart", "moveend"
+        "movestart", "move", "moveend"
     );
 
     /**
@@ -47,6 +61,7 @@ export class Map extends UTILS.EventListener{
         this.moveToHome();
 
         this.playerQueue = [];
+        this.mapLock = true;
         this.loopid;
     }
 
@@ -70,24 +85,36 @@ export class Map extends UTILS.EventListener{
         this.triggerEvent(Map.EVENTTYPES.loopstart, {});
         let playerQueue = Array.from(this.playerQueue);
         this.playerQueue = [];
+        if(this.mapLock) return this.loopid = window.setTimeout(this.moveLoop.bind(this), UTILS.LOOPRATE);
+        let moves = [];
+
+        // Sort the actions into moves and inventory
+        for(let action of playerQueue){
+            if(action.action === mapactions.MOVE) moves.push(action.value);
+        }
+
+        // Right now we're only resolving the first move action in the queue
+        if(moves.length) this.handleMove(moves[0]);
         
         this.triggerEvent(Map.EVENTTYPES.loopend, {});
         this.loopid = window.setTimeout(this.moveLoop.bind(this), UTILS.LOOPRATE);
     }
 
-    handleMove(queue){
-        let direction = Infinity;
-        for(let [key,symbol] of Object.entries(directions)){
-            if(-1 < queue.indexOf(key) < direction) direction = queue.indexOf(key);
-            if(-1 < queue.indexOf(symbol) < direction) direction = queue.indexOf(symbol);
-        }
-        if(direction === Infinity) return;
-        
-        direction = queue[direction]
+    /**
+     * Takes a direction and attempts to move the character in that direction
+     * We could execute them all, but that could introduce exploits.
+     * @param {Symbol | String} direction - A  enumerated direction string or Symbol
+     */
+    handleMove(direction){
+        if(typeof direction !== "symbol") direction = directions[direction];
+        // invalid direction
+        if(typeof direction === "undefined") return;
+
         let result;
         [direction, result] = this.move(direction);
-        this.triggerEvent(Map.EVENTTYPES.endmove, {direction, playerLocation: this.playerLocation});
+        this.triggerEvent(Map.EVENTTYPES.moveend, {direction, playerLocation: this.playerLocation});
 
+        console.log(direction, result)
         if(!result) return;
         // Subtract the required fuel
         // NOTE - There didn't seem to be a cost-difference for terrain type in A Dark Room
@@ -103,8 +130,9 @@ export class Map extends UTILS.EventListener{
      * @param {String} direction 
      */
     move(direction){
-        this.triggerEvent(Map.EVENTTYPES.startmove, {direction, playerLocation: this.playerLocation});
-        if(typeof direction !== "Symbol") direction = directions[direction];
+        this.triggerEvent(Map.EVENTTYPES.movestart, {direction, playerLocation: this.playerLocation});
+        if(typeof direction !== "symbol") direction = directions[direction];
+        console.log(`Moving: ${direction.description}`)
         let curr = [... this.playerLocation];
         // Each direction changes the Player's positions by 1 square in the
         // x or y axis
@@ -122,14 +150,14 @@ export class Map extends UTILS.EventListener{
                 curr[0]-=1;
                 break;
             default: // As always, we should raise an error, but are not for simplicity's sake
-                return;
+                return [null, null];
         }
         // Make sure we haven't moved off the map
         if(0 <= curr[0] <= MAPSIZE-1 && 0 <= curr[1] <= MAPSIZE-1){
             // Update player's location
             this.playerLocation = curr;
             this.triggerEvent(Map.EVENTTYPES.move, {direction, playerLocation: this.playerLocation});
-            return true;
+            return [direction, true];
         }
         // We return without doing anything if we moved off the map (return null;)
     }
@@ -145,6 +173,8 @@ export class Map extends UTILS.EventListener{
      * @returns {String[]} - The map
      */
     getMap(mask){
+        if(typeof mask === "undefined") mask = this.mask;
+
         // Copy the map
         let map = Array.from(this.map);
         
@@ -163,11 +193,24 @@ export class Map extends UTILS.EventListener{
         for(let i = 0; i < map.length; i++){
             // Split the current map row into individual characters
             let mapstringarray = map[i].split("");
+            let maskarray = mask[i];
+            let rowmaskvalue = maskarray.reduce((a,b)=>a+b);
+            // If maskarray is empty (All zeroes), do not show any characters on this row
+            if(!rowmaskvalue){
+                // Empty row
+                map[i]="                     ";
+                continue;
+            // If maskarray is all 1's
+            }else if(rowmaskvalue == MAPSIZE){
+                // Everything is displayed as-is
+                continue;
+            }
+            // In this case some characters in the array are displayed and some are not
             let out = "";
             // Iterator for both mapstringarray and the current mask row(mask[i])
             // If there's a character at mapstringarray[x] and mask[i][x] is not 0,
             // then add the character to the output; otherwise add a space
-            for(let x = 0; x < mapstringarray.length; x++) out += mapstringarray[x]&&mask[i][x]? mapstringarray[x] : " ";
+            for(let x = 0; x < mapstringarray.length; x++) out += mapstringarray[x]&&maskarray[x]? mapstringarray[x] : " ";
 
             // Replace the map row with the masked output
             map[i] = out;

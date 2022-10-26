@@ -33,9 +33,27 @@ class Entity{
 }
 
 /**
+ * A workaround to implment multiple inheritances for Characters 
+ * which should extend both Entity and EventListener
+ */
+class Character extends Entity{
+    static EVENTTYPES = UTILS.enumerate("inventorychange");
+    constructor(id, roles, events){
+        super(id, roles);
+        this.eventlistener = new UTILS.EventListener(events);
+
+        if(typeof this.getDefaultEventData !== "undefined")this.eventlistener.getDefaultEventData = this.getDefaultEventData;
+
+        for(let prop of ["addEventListener", "removeEventListener", "triggerEvent"]){
+            this[prop] = this.eventlistener[prop];
+        }
+    }
+}
+
+/**
  * The Player Character's entity which has additional functionality
  */
-export class PlayerCharacter extends Entity{
+export class PlayerCharacter extends Character{
     /**
      * 
      * @param {Number} id - The enumerated id of this specific Entity
@@ -106,7 +124,7 @@ export class PlayerCharacter extends Entity{
 /**
  * A sublcass of Entity which comes with combat statistics and functions
  */
-export class CombatCharacter extends Entity{
+export class CombatCharacter extends Character{
     /**
      * 
      * @param {Number} id - The enumerated id of this specific Entity

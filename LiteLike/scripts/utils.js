@@ -84,6 +84,7 @@ export class EventListener{
 
     constructor(events){
         // Super Simple EventListener setup
+        if(!events || typeof events == "undefined") events = {};
         this._events = events;
         this._listeners = {};
         for(let sym of Object.values(this._events)){

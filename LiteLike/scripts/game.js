@@ -68,6 +68,7 @@ export class Game{
             {
                 weapons: [new EQUIP.Weapon(this.ITEMS.weapons[0])],
                 armor:this.ITEMS.armor[0],
+                transport: this.ITEMS.transports[0],
                 items:[new EQUIP.Item(this.ITEMS.items[0], 1)]
             })
     }
