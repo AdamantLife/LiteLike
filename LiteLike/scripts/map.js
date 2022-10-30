@@ -1,6 +1,7 @@
 "use strict";
 
 import * as UTILS from "./utils.js";
+import { PlayerCharacter } from "./character.js";
 
 // Map is 21x21 grid
 const MAPSIZE = 21;
@@ -16,6 +17,12 @@ const MOVEREPAIRCOST = 1/2;
 // How the Player is represented on the Text Map
 // This is the traditional rogue symbol
 const PLAYERSYMBOL = "@";
+// Colony Symbol
+const COLONYSYMBOL = "C";
+// Port Symbol
+const PORTSYMBOL = "#";
+// Dungeon Symbol
+const DUNGEONSYMBOL = "$";
 
 export const directions = UTILS.enumerate("NORTH","EAST","SOUTH","WEST");
 
@@ -41,7 +48,10 @@ export class MapAction{
 export class Map extends UTILS.EventListener{
     static EVENTTYPES = UTILS.enumerate(
         "loopstart", "loopend",
-        "movestart", "move", "moveend"
+        "movestart", "move", "moveend",
+        "enterport", "leaveport",
+        "enterdungeon", "leavedungeon",
+        "entercolony", "leavecolony"
     );
 
     /**
@@ -114,15 +124,25 @@ export class Map extends UTILS.EventListener{
         [direction, result] = this.move(direction);
         this.triggerEvent(Map.EVENTTYPES.moveend, {direction, playerLocation: this.playerLocation});
 
-        console.log(direction, result)
         if(!result) return;
         // Subtract the required fuel
         // NOTE - There didn't seem to be a cost-difference for terrain type in A Dark Room
         //          If there was, we would calclulate that here
         this.player.equipment.transport.reactorPower -= MOVEFUELCOST;
+        this.player.triggerEvent(PlayerCharacter.EVENTTYPES.equipmentchange, {transport:this.player.equipment.transport});
         // Subtract required repair cost
         // Repairbots are always the first (0-index) item
         this.player.equipment.items[0].quantity -= MOVEREPAIRCOST;
+        
+        // Actual inventory changed
+        // We have to check like this because MOVEREPAIRCOST is fractional and we round up
+        let inventorychange = Math.ceil(this.player.equipment.items[0].quantity) - Math.ceil(this.player.equipment.items[0].quantity+MOVEREPAIRCOST);
+        if(inventorychange){
+            // Notify that inventory has changed
+            this.player.triggerEvent(PlayerCharacter.EVENTTYPES.itemschange, {0:inventorychange});
+        }
+
+        
     }
 
     /**
@@ -132,30 +152,58 @@ export class Map extends UTILS.EventListener{
     move(direction){
         this.triggerEvent(Map.EVENTTYPES.movestart, {direction, playerLocation: this.playerLocation});
         if(typeof direction !== "symbol") direction = directions[direction];
-        console.log(`Moving: ${direction.description}`)
-        let curr = [... this.playerLocation];
+        let destination = [... this.playerLocation];
         // Each direction changes the Player's positions by 1 square in the
         // x or y axis
         switch(direction){
             case directions.NORTH:
-                curr[1]-=1;
+                destination[1]-=1;
                 break;
             case directions.EAST:
-                curr[0]+=1;
+                destination[0]+=1;
                 break;
             case directions.SOUTH:
-                curr[1]+=1;
+                destination[1]+=1;
                 break;
             case directions.WEST:
-                curr[0]-=1;
+                destination[0]-=1;
                 break;
             default: // As always, we should raise an error, but are not for simplicity's sake
                 return [null, null];
         }
         // Make sure we haven't moved off the map
-        if(0 <= curr[0] <= MAPSIZE-1 && 0 <= curr[1] <= MAPSIZE-1){
+        if(0 <= destination[0] <= MAPSIZE-1 && 0 <= destination[1] <= MAPSIZE-1){
+            // Check if the player is moving into or out of a port, colony, or dungeon
+            let fromSymbol = this.getSymbolAtLocation(this.playerLocation), toSymbol = this.getSymbolAtLocation(destination);
+
+            // Out of a special location
+            switch(fromSymbol){
+                case COLONYSYMBOL:
+                    this.triggerEvent(Map.EVENTTYPES.leavecolony, {direction, playerLocation: Map.playerLocation, destination});
+                    break;
+                case PORTSYMBOL:
+                    this.triggerEvent(Map.EVENTTYPES.leaveport, {direction, playerLocation: Map.playerLocation, destination});
+                    break;
+                case DUNGEONSYMBOL:
+                    this.triggerEvent(Map.EVENTTYPES.leavedungeon, {direction, playerLocation: Map.playerLocation, destination});
+                    break;
+            }
+            // Into a special location
+            switch(toSymbol){
+                case COLONYSYMBOL:
+                    this.triggerEvent(Map.EVENTTYPES.entercolony, {direction, playerLocation: Map.playerLocation, destination});
+                    break;
+                case PORTSYMBOL:
+                    this.triggerEvent(Map.EVENTTYPES.enterport, {direction, playerLocation: Map.playerLocation, destination});
+                    break;
+                case DUNGEONSYMBOL:
+                    this.triggerEvent(Map.EVENTTYPES.enterdungeon, {direction, playerLocation: Map.playerLocation, destination});
+                    break;
+            }
+
             // Update player's location
-            this.playerLocation = curr;
+            this.playerLocation = destination;
+            // Notify that player has moved
             this.triggerEvent(Map.EVENTTYPES.move, {direction, playerLocation: this.playerLocation});
             return [direction, true];
         }
@@ -218,5 +266,23 @@ export class Map extends UTILS.EventListener{
 
         // Return the masked map
         return map
+    }
+
+    /**
+     * Returns the terrain symbol at the given location
+     * 
+     * @param {Number[]} location - A length-2 array of integers that fall within the map
+     * @returns {undefined | String} - Returns the terrain symbol for the given location, or undefined for invalid location
+     */
+    getSymbolAtLocation(location){
+        if(0 > location[0] > MAPSIZE || 0 > location[1] > MAPSIZE) return undefined;
+        // Copy the map
+        let map = Array.from(this.map);
+        
+        // Get the row for the location y coord
+        let row = map[location[1]];
+
+        // Return only the character at the given location x coord
+        return row.slice(location[0],location[0]+1);
     }
 }

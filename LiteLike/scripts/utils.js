@@ -87,8 +87,21 @@ export class EventListener{
         if(!events || typeof events == "undefined") events = {};
         this._events = events;
         this._listeners = {};
+        this._initializeListeners();
+    }
+    
+    /**
+     * Initializes all missing, valid listener events in the _listeners object
+     */
+    _initializeListeners(){
+        // For each valid event
         for(let sym of Object.values(this._events)){
-            this._listeners[sym] = [];
+
+            // check if event is already initialized
+            let value = this._listeners[sym]
+
+            // If it isn't, create an entry for it
+            if(!value || typeof value === "undefined") this._listeners[sym] = [];
         }
     }
 
@@ -157,6 +170,16 @@ export class EventListener{
     }
 
     /**
+     * Removes all listeners from the EventListener
+     */
+    removeAllListeners(){
+        // Simply blank _listeners
+        this._listeners = {};
+        // And then reinitialize it
+        this._initializeListeners();
+    }
+
+    /**
      * Call all Callbacks for the given eventtype
      * @param {String | Symbol} eventtype - The eventtype which triggers the callback
      *                                  (either the stringname or the enumeration) 
@@ -164,6 +187,8 @@ export class EventListener{
      */
     triggerEvent(eventtype, additional){
         eventtype = this._validateEventType(eventtype);
+        // Silently fail if eventtype is not valid, as we do in other places
+        if(!eventtype) return;
         let event = new Event(eventtype.description);
         Object.assign(event, this.getDefaultEventData());
         // If additional properties were passed, add them
@@ -172,7 +197,7 @@ export class EventListener{
         }
         for(let listener of this._listeners[eventtype]){
             let result = listener(event);
-            // TODO: consider cancelling event via listener
+            if(result === false) return;
         }
     }
 

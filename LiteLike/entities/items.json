@@ -64,19 +64,19 @@
     ],
     "transport":[
         {
-            "reactorPower":10,
+            "maxReactorPower":10,
             "capacity":10,
             "shopPrerequisites":[],
             "shopCost":[]
         },
         {
-            "reactorPower":15,
+            "maxReactorPower":15,
             "capacity":15,
             "shopPrerequisites":[],
             "shopCost":[]
         },
         {
-            "reactorPower":20,
+            "maxReactorPower":20,
             "capacity":20,
             "shopPrerequisites":[],
             "shopCost":[]

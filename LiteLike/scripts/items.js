@@ -324,4 +324,11 @@ export class Transport extends ShopItem{
         this.reactorPower = this.maxReactorPower;
     }
 
+    /**
+     * Sets the Transport's reactorPower to maxReactorPower
+     */
+    topOff(){
+        this.reactorPower = this.maxReactorPower;
+    }
+
 }

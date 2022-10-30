@@ -37,15 +37,15 @@ class Entity{
  * which should extend both Entity and EventListener
  */
 class Character extends Entity{
-    static EVENTTYPES = UTILS.enumerate("inventorychange");
-    constructor(id, roles, events){
+    static EVENTTYPES = UTILS.enumerate("equipmentchange", "itemschange", "resourceschange", "hpchange", "currentHPchange");
+    constructor(id, roles){
         super(id, roles);
-        this.eventlistener = new UTILS.EventListener(events);
+        this.eventlistener = new UTILS.EventListener(Character.EVENTTYPES);
 
         if(typeof this.getDefaultEventData !== "undefined")this.eventlistener.getDefaultEventData = this.getDefaultEventData;
 
-        for(let prop of ["addEventListener", "removeEventListener", "triggerEvent"]){
-            this[prop] = this.eventlistener[prop];
+        for(let prop of ["addEventListener", "removeEventListener", "removeAllListeners", "triggerEvent"]){
+            this[prop] = this.eventlistener[prop].bind(this.eventlistener);
         }
     }
 }

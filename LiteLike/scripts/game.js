@@ -63,14 +63,17 @@ export class Game{
      * Returns a starting player character
      */
      startingCharacter(){
-        return new PlayerCharacter(0, [roles.CHARACTER, roles.PLAYER],
+        let player = new PlayerCharacter(0, [roles.CHARACTER, roles.PLAYER],
             {hp:5, currentHP: 5},
             {
                 weapons: [new EQUIP.Weapon(this.ITEMS.weapons[0])],
                 armor:this.ITEMS.armor[0],
                 transport: this.ITEMS.transports[0],
                 items:[new EQUIP.Item(this.ITEMS.items[0], 1)]
-            })
+            });
+        // Because transports are singletons, we need to reset its reactorPower
+        player.equipment.transport.topOff();
+        return player;
     }
 
     initializeColony(){
