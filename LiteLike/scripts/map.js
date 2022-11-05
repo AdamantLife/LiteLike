@@ -19,7 +19,8 @@ const MOVEREPAIRCOST = 1/2;
 const PLAYERSYMBOL = "@";
 // Colony Symbol
 const COLONYSYMBOL = "C";
-// Port Symbol
+// Port Symbols
+const UNEXPLOREDPORT = "!"
 const PORTSYMBOL = "#";
 // Dungeon Symbol
 const DUNGEONSYMBOL = "$";
@@ -49,6 +50,7 @@ export class Map extends UTILS.EventListener{
     static EVENTTYPES = UTILS.enumerate(
         "loopstart", "loopend",
         "movestart", "move", "moveend",
+        "enterunexplored", "leaveunexplored",
         "enterport", "leaveport",
         "enterdungeon", "leavedungeon",
         "entercolony", "leavecolony"
@@ -176,30 +178,41 @@ export class Map extends UTILS.EventListener{
             // Check if the player is moving into or out of a port, colony, or dungeon
             let fromSymbol = this.getSymbolAtLocation(this.playerLocation), toSymbol = this.getSymbolAtLocation(destination);
 
+            let eventtype;
             // Out of a special location
             switch(fromSymbol){
                 case COLONYSYMBOL:
-                    this.triggerEvent(Map.EVENTTYPES.leavecolony, {direction, playerLocation: Map.playerLocation, destination});
+                    eventtype = Map.EVENTTYPES.leavecolony;
+                    break;
+                case UNEXPLOREDPORT:
+                    eventtype = Map.EVENTTYPES.leaveunexplored;
                     break;
                 case PORTSYMBOL:
-                    this.triggerEvent(Map.EVENTTYPES.leaveport, {direction, playerLocation: Map.playerLocation, destination});
+                    eventtype = Map.EVENTTYPES.leaveport;
                     break;
                 case DUNGEONSYMBOL:
-                    this.triggerEvent(Map.EVENTTYPES.leavedungeon, {direction, playerLocation: Map.playerLocation, destination});
+                    eventtype = Map.EVENTTYPES.leavedungeon;
                     break;
             }
+            if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: Map.playerLocation, destination});
+
+            eventtype = null;
             // Into a special location
             switch(toSymbol){
                 case COLONYSYMBOL:
-                    this.triggerEvent(Map.EVENTTYPES.entercolony, {direction, playerLocation: Map.playerLocation, destination});
+                    eventtype = Map.EVENTTYPES.entercolony;
+                    break;
+                case UNEXPLOREDPORT:
+                    eventtype = Map.EVENTTYPES.enterunexplored;
                     break;
                 case PORTSYMBOL:
-                    this.triggerEvent(Map.EVENTTYPES.enterport, {direction, playerLocation: Map.playerLocation, destination});
+                    eventtype = Map.EVENTTYPES.enterport;
                     break;
                 case DUNGEONSYMBOL:
-                    this.triggerEvent(Map.EVENTTYPES.enterdungeon, {direction, playerLocation: Map.playerLocation, destination});
+                    eventtype = Map.EVENTTYPES.enterdungeon;
                     break;
             }
+            if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: Map.playerLocation, destination});
 
             // Update player's location
             this.playerLocation = destination;

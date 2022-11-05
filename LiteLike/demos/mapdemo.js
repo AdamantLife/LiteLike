@@ -1,12 +1,13 @@
 "use strict";
 
 import {toggleAllButtons, clearDemoBox} from "./utils.js";
+import * as CHARA from "../scripts/character.js";
 import * as IO from "../scripts/io.js";
 import * as UTILS from "../scripts/utils.js";
 import * as MAP from "../scripts/map.js";
 import * as KEYBINDINGS from "../scripts/keybindings.js";
 
-var DEMOMAP = ".....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n..........C..........\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................";
+var DEMOMAP = ".....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n..........!..........\n.....................\n..........C..........\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................";
 
 export function mapDemo(){
     // Disable all buttons to avoid shenanigans
@@ -25,9 +26,13 @@ export function mapDemo(){
 
     // Setup the map area div and get a reference
     document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<div id="mapDemo" style="position:relative;"><div id="inventoryBox" style="position:absolute; display:none;"></div>
+    <div id="combatBox" style="position:absolute; display:none;display:inline-flex;float:left"></div>
     <div id="foodRepairBox"><div data-type="hp"><span style="font-weight:bold;">HP: </span><span data-value></span>/${GAME.PLAYER.statistics.hp}</div><div data-type="fuel"><span style="font-weight:bold;">Reactor Power: </span><span data-value></span></div><div data-type="repair"><span style="font-weight:bold;">Repair Bots: </span><span data-value></span></div></div><div id="mapBox" style="font-family:monospace;display:inline;letter-spacing:1em;"></div></div>`);
+
     // Popup box which shows all items collected
     let inventoryBox = document.getElementById("inventoryBox");
+    // Combat box which will show up on Combat Events
+    let combatBox = document.getElementById("combatBox");
     // Display travel resources (food and repairbots)
     let foodRepairBox = document.getElementById("foodRepairBox");
     // Displays the Map
@@ -63,6 +68,50 @@ export function mapDemo(){
     }
 
     updateTravelResources();
+
+    /**
+     * Initializes the combatBox for the given combat
+     * If combatBox needs to be displayed/unhidden, that should be done separately
+     * @param {Combat} combat - the combat being initialized
+     */
+    function initializeCombatBox(combat){
+        function buildStatBlock(chara){
+            let charaString = IO.getStrings(GAME.STRINGS, chara);
+            return `
+<div style="width:50%;" data-combatant="${chara.roles.indexof(CHARA.roles.PLAYER) >= 0 ? "player" : "enemy"}">
+    <h1 title="${charaString.flavor}">${charaString.name}</h1>
+    <table class="boldfirst"><tbody>
+    <tr><td>HP</td><td><span data-hp>${chara.statistics.currentHP}</span>/${chara.statistics.hp}</td></tr>
+    </tbody></table>
+    <h3>Weapons</h3>
+    <table data-loadout="weapons"><tbody>
+    <tr><td data-slot1></td><td></td><td data-slot2></td></tr>
+    <tr><td></td><td data-slot3></td><td></td></tr>
+    <tr><td data-slot4></td><td></td><td data-slot5></td></tr>
+    </tbody></table>
+    <h3>Items</h3>
+    <table data-loadout="items"><tbody>
+    <tr><td data-slot1></td><td data-slot2></td><td data-slot3></td></tr>
+    </table></tbody>
+</div>`
+        }
+
+        // Clear combatBox
+        while(combatBox.lastElementChild) combatBox.removeChild(combatBox.lastElementChild);
+        // Insert Player Character
+        combatBox.insertAdjacentHTML('beforeend', buildStatBlock(combat.player));
+        // Insert Enemy Character
+        combatBox.insertAdjacentHTML('beforeend', buildStatBlock(combat.enemy));
+
+        let weaponstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="weapons"]`);
+        for(let i = 0; i < CHARA.CHARAWEAPONLOADOUT; i++){
+            weapon = combat.player.equipment.weapons[i];
+            // No weapon at loadout slot
+            if(!weapon || typeof weapon == "undefined") continue;
+            weaponstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`<button></button>`);
+        }
+        let itemstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="items"]`);
+    }
 
     /**
      * Reloads the map onto the page
@@ -124,8 +173,15 @@ export function mapDemo(){
     function reloadResources(){
         // Top Of (max out) the transport's reactorPower
         GAME.PLAYER.equipment.transport.topOff();
-        // Give the Player +5 Repair Bots
-        GAME.PLAYER.equipment.items[0].quantity+=5;
+        // Give the Player +3 Repair Bots
+        GAME.PLAYER.equipment.items[0].quantity+=3;
+    }
+
+    /**
+     * Triggers a "fight" against a Bandit
+     */
+    function portEvent(){
+
     }
 
     // Register callbacks
@@ -135,6 +191,8 @@ export function mapDemo(){
     GAME.PLAYER.addEventListener("equipmentchange", updateTravelResources);
     GAME.MAP.addEventListener("entercolony", reloadResources);
     GAME.MAP.addEventListener("enterport", reloadResources);
+    GAME.MAP.addEventListener("enterunexplored", portEvent);
+
 
     function finishDemo(){
         // Re-enable all buttons

@@ -1,0 +1,3 @@
+table.boldfirst tr>td:first-of-type{
+    font-weight: bold;
+}

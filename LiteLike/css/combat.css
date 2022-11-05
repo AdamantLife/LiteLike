@@ -1,0 +1,3 @@
+table[data-loadout] td[data-slot*]{
+    width:33%;
+}

@@ -35,9 +35,19 @@ export class Game{
 
         // Database of all items
         this.ITEMS = null;
+        // Database of all events (requires self.ITEMS to intialize)
+        this.EVENTS;
         // Load the items
         IO.loadItems()
-            .then(result=>{this.ITEMS = result;})
+            .then(result=>{
+                this.ITEMS = result;
+                // After items are loaded, load Events
+                IO.loadEvents(result)
+                    .then(result=>{
+                        this.EVENTS = result;
+                    })
+                    .catch(error=>console.log(error));
+            })
             .catch(error=> console.log(error));
 
         this.JOBS = null;

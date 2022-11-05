@@ -1,6 +1,8 @@
 "use strict";
 import * as EQUIP from "./items.js";
 import * as COLONY from "./colony.js";
+import * as EVENTS from "./events.js";
+import * as CHARACTER from "./character.js"
 import {instanceFromJSON} from "./utils.js";
 import {itemCallbacks} from "./callbacks.js";
 
@@ -87,6 +89,9 @@ export function loadStrings(language){
     // Return the resulting promise so the calling function can do something afterwards
 }
 
+/**
+ * Loads items from colony.json
+ */
 export function loadColony(){
 
     function parse(data){
@@ -110,6 +115,54 @@ export function loadColony(){
         .then(data=>parse(data))                // The pass the converted object to the parse function
     // Return the resulting promise so that the calling function can take
     // action after it is done
+}
+
+/**
+ * Loads items from events.json
+ * Requires items.json to be loaded beforehand
+ * @param {Object} items - The parsed values of items.json
+ */
+export function loadEvents(items){
+    function parse(data){
+        let combatants = [];
+
+        // Parse Combatants
+        for(let id=0; id < data.combatants.length; i++){
+            let comb = data.combatants[id];
+
+            // Compile weapons
+            let weapons = [];
+            // Get WeaponType for each weaponid and convert to Weapon Object
+            for(let weaponid of comb.weapons) weapons.push(new EQUIP.Weapon(items.weapon[weaponid]));
+
+            // Compile items
+            let items = [];
+            // Get ItemType for each itemid and convert to Item Object with the given quantity
+            for(let [itemid, qty] of comb.items) items.push(new EQUIP.Item(items.item[itemid], qty));
+
+            combatants.push(new CHARACTER.CombatCharacter(
+                // ID, Roles
+                // Combatants are all Enemys
+                id, [CHARACTER.roles.CHARACTER, CHARACTER.roles.ENEMY],
+                // Statistics
+                // All combatants start at full hp
+                {hp: comb.hp, currentHP: comb.hp},
+                // Equipment
+                {
+                    weapons,
+                    armor: items.armor[comb.armor],
+                    items
+                }));
+        }
+
+        return {combatants};
+    }
+    
+    return fetch("./entities/events.json")  // Fetch events.json from the server
+        .then(r=>r.json())                  // Conver the file to an Object (json)
+        .then(data=>parse(data))            // Pass the converted obejct to the parse function
+    
+    // Return the resulting promis so that the calling function can take action after it is done
 }
 
 /**

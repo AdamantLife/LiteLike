@@ -4,6 +4,9 @@ import * as UTILS from "./utils.js";
 
 export const roles = UTILS.enumerate("PLAYER", "ENEMY", "CHARACTER", "ITEM");
 
+export const CHARAWEAPONLOADOUT = 5;
+export const CHARAITEMLOADOUT = 3;
+
 /**
  * An individual entity within the game
  */

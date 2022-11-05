@@ -1,0 +1,13 @@
+{
+        "combatants":[
+            {
+                "name":1,
+                "hp":5,
+                "weapons":[
+                    1
+                ],
+                "armor":0,
+                "items":[]
+            }
+        ]
+}
