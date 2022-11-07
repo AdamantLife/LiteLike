@@ -9,5 +9,13 @@
                 "armor":0,
                 "items":[]
             }
-        ]
+        ],
+        "tiers":{
+            "combatants":[
+
+            ],
+            "rewards":[
+                
+            ]
+        }
 }

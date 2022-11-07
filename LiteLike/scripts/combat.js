@@ -169,7 +169,7 @@ export class Combat extends UTILS.EventListener{
         let result = this.triggerEvent(Combat.EVENTTYPES.useweapon, {action, result: "damage", damage});
         
         // Apply the damage to the opponent
-        action.opponent.statistics.currentHP -= damage;
+        action.opponent.adjustHP(-damage);
 
         // Have weapon set itself as fired
         // We're allowing weapon to handle this itself incase using a weapon becomes

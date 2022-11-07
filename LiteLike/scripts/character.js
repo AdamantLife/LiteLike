@@ -51,6 +51,16 @@ class Character extends Entity{
             this[prop] = this.eventlistener[prop].bind(this.eventlistener);
         }
     }
+
+    adjustHP(value){
+        // Don't do anything if hp hasn't changed
+        if(!value) return;
+        // get new hp
+        let hp = this.statistics.currentHP + value;
+        // make sure to bound hp between 0 and hp
+        this.statistics.currentHP = Math.max(0,Math.min(hp, this.statistics.hp));
+        this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP});
+    }
 }
 
 /**

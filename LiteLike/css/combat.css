@@ -1,3 +1,20 @@
-table[data-loadout] td[data-slot*]{
+table[data-loadout] td{
     width:33%;
+}
+table[data-loadout] tr{
+    width:100%;
+}
+
+#combat{
+    position:absolute;
+    display:inline-flex;
+    float:left;
+    flex-wrap:wrap;
+    border-style:outset;
+    background-color: white;
+}
+
+#combat>.character{
+    width:50%;
+    min-width: 25em;
 }

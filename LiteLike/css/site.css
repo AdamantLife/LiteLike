@@ -1,3 +1,57 @@
 table.boldfirst tr>td:first-of-type{
     font-weight: bold;
 }
+
+.popup {
+    /* Centering and margins */
+    left:10px;
+    right:10px;
+    height: 50vh;
+    margin-right:auto;
+    margin-left:auto;
+}
+
+.popup.shown {
+    display:initial;
+    animation: 1s ease-in 0s openwindow;
+}
+
+.popup.hidden{
+    display: none !important;
+    animation: 1s ease-in 0s closewindow;
+}
+
+@keyframes openwindow {
+    from {
+        display:none !important;
+        width:0px;
+        height:0px;
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+    to {
+        display:initial;
+        width: calc(100% - 20px);
+        height:50vh;
+        flex-wrap: initial;
+        overflow: hidden;
+    }
+}
+
+@keyframes closewindow {
+    from {
+        display:initial;
+        width: calc(100%-20px);
+        height:50vh;
+        flex-wrap: initial;
+        overflow: hidden;
+    }
+    to {
+        display:none !important;
+        width:0;
+        height:0;
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+}
+

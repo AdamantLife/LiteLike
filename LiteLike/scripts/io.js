@@ -127,23 +127,23 @@ export function loadEvents(items){
         let combatants = [];
 
         // Parse Combatants
-        for(let id=0; id < data.combatants.length; i++){
+        for(let id=0; id < data.combatants.length; id++){
             let comb = data.combatants[id];
 
             // Compile weapons
             let weapons = [];
             // Get WeaponType for each weaponid and convert to Weapon Object
-            for(let weaponid of comb.weapons) weapons.push(new EQUIP.Weapon(items.weapon[weaponid]));
+            for(let weaponid of comb.weapons) weapons.push(new EQUIP.Weapon(items.weapons[weaponid]));
 
             // Compile items
-            let items = [];
+            let combitems = [];
             // Get ItemType for each itemid and convert to Item Object with the given quantity
-            for(let [itemid, qty] of comb.items) items.push(new EQUIP.Item(items.item[itemid], qty));
+            for(let [itemid, qty] of comb.items) combitems.push(new EQUIP.Item(items.items[itemid], qty));
 
             combatants.push(new CHARACTER.CombatCharacter(
                 // ID, Roles
                 // Combatants are all Enemys
-                id, [CHARACTER.roles.CHARACTER, CHARACTER.roles.ENEMY],
+                comb.name, [CHARACTER.roles.CHARACTER, CHARACTER.roles.ENEMY],
                 // Statistics
                 // All combatants start at full hp
                 {hp: comb.hp, currentHP: comb.hp},
@@ -151,7 +151,7 @@ export function loadEvents(items){
                 {
                     weapons,
                     armor: items.armor[comb.armor],
-                    items
+                    items: combitems
                 }));
         }
 

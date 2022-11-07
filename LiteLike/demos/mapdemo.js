@@ -3,6 +3,7 @@
 import {toggleAllButtons, clearDemoBox} from "./utils.js";
 import * as CHARA from "../scripts/character.js";
 import * as IO from "../scripts/io.js";
+import * as EVENTS from "../scripts/events.js";
 import * as UTILS from "../scripts/utils.js";
 import * as MAP from "../scripts/map.js";
 import * as KEYBINDINGS from "../scripts/keybindings.js";
@@ -26,13 +27,13 @@ export function mapDemo(){
 
     // Setup the map area div and get a reference
     document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<div id="mapDemo" style="position:relative;"><div id="inventoryBox" style="position:absolute; display:none;"></div>
-    <div id="combatBox" style="position:absolute; display:none;display:inline-flex;float:left"></div>
+    <div id="combat" class="popup hidden"></div>
     <div id="foodRepairBox"><div data-type="hp"><span style="font-weight:bold;">HP: </span><span data-value></span>/${GAME.PLAYER.statistics.hp}</div><div data-type="fuel"><span style="font-weight:bold;">Reactor Power: </span><span data-value></span></div><div data-type="repair"><span style="font-weight:bold;">Repair Bots: </span><span data-value></span></div></div><div id="mapBox" style="font-family:monospace;display:inline;letter-spacing:1em;"></div></div>`);
 
     // Popup box which shows all items collected
     let inventoryBox = document.getElementById("inventoryBox");
     // Combat box which will show up on Combat Events
-    let combatBox = document.getElementById("combatBox");
+    let combatBox = document.getElementById("combat");
     // Display travel resources (food and repairbots)
     let foodRepairBox = document.getElementById("foodRepairBox");
     // Displays the Map
@@ -61,8 +62,8 @@ export function mapDemo(){
             if(GAME.PLAYER.statistics.currentHP <= 0) message.push("HP");
             if(GAME.PLAYER.equipment.transport.reactorPower <= 0) message.push("Reactor Power");
             message = message.join(" and ");
-            window.alert(`Game Over: You have run out of ${message}!`);
-            finishDemo();
+            message = `Game Over: You have run out of ${message}!`;
+            gameOver(message);
             return false;
         }
     }
@@ -75,23 +76,24 @@ export function mapDemo(){
      * @param {Combat} combat - the combat being initialized
      */
     function initializeCombatBox(combat){
+
         function buildStatBlock(chara){
             let charaString = IO.getStrings(GAME.STRINGS, chara);
             return `
-<div style="width:50%;" data-combatant="${chara.roles.indexof(CHARA.roles.PLAYER) >= 0 ? "player" : "enemy"}">
+<div class="character" data-combatant="${chara.roles.indexOf(CHARA.roles.PLAYER) >= 0 ? "player" : "enemy"}">
     <h1 title="${charaString.flavor}">${charaString.name}</h1>
     <table class="boldfirst"><tbody>
     <tr><td>HP</td><td><span data-hp>${chara.statistics.currentHP}</span>/${chara.statistics.hp}</td></tr>
     </tbody></table>
     <h3>Weapons</h3>
     <table data-loadout="weapons"><tbody>
-    <tr><td data-slot1></td><td></td><td data-slot2></td></tr>
-    <tr><td></td><td data-slot3></td><td></td></tr>
-    <tr><td data-slot4></td><td></td><td data-slot5></td></tr>
+    <tr><td data-slot0></td><td></td><td data-slot1></td></tr>
+    <tr><td></td><td data-slot2></td><td></td></tr>
+    <tr><td data-slot3></td><td></td><td data-slot4></td></tr>
     </tbody></table>
     <h3>Items</h3>
     <table data-loadout="items"><tbody>
-    <tr><td data-slot1></td><td data-slot2></td><td data-slot3></td></tr>
+    <tr><td data-slot0></td><td data-slot1></td><td data-slot2></td></tr>
     </table></tbody>
 </div>`
         }
@@ -105,12 +107,20 @@ export function mapDemo(){
 
         let weaponstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="weapons"]`);
         for(let i = 0; i < CHARA.CHARAWEAPONLOADOUT; i++){
-            weapon = combat.player.equipment.weapons[i];
+            let weapon = combat.player.weapons[i];
             // No weapon at loadout slot
             if(!weapon || typeof weapon == "undefined") continue;
-            weaponstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`<button></button>`);
+            let weaponstring = IO.getStrings(GAME.STRINGS, weapon);
+            weaponstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`<button title="${weaponstring.flavor}">${weaponstring.name}</button>`);
         }
         let itemstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="items"]`);
+        for(let i = 0; i < CHARA.CHARAITEMLOADOUT; i++){
+            let item = combat.player.items[i];
+            // No Items at loadout slot
+            if(!item || typeof item == "undefined") continue;
+            let itemstring = IO.getStrings(GAME.STRINGS, item);
+            itemstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend', `<button title="${itemstring.flavor}">${itemstring.name}</button>`);
+        }
     }
 
     /**
@@ -128,7 +138,7 @@ export function mapDemo(){
     }
 
     // Add the Quit button
-    document.getElementById("demoBox").insertAdjacentHTML("beforeend","<button id=quitMap>Quit Demo</button>");
+    document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<button id="quitMap", style="position:sticky;bottom:5px;">Quit Demo</button>`);
     // Attach the finishDemo callback
     document.getElementById("quitMap").onclick = finishDemo;
 
@@ -140,6 +150,13 @@ export function mapDemo(){
     function handleKeyPress(event){
         // Get String-Name of the key
         let key = event.key;
+        // Combat is displayed, so only handle input for combat
+        if(combatBox.classList.contains("shown")) return handleCombatKeyPress(key);
+        // Inventory is displayed, so only handle input for Inventory
+        if(inventoryBox.classList.contains("shown")) return handleInventoryKeyPress(key);
+
+        console.log('moving')
+        // Otherwise, we're on the map view, so handle map-only inputs
         // If the key is in KB.KEYDIRECTIONS 
         if(typeof KEYBINDINGS.KEYDIRECTIONS[key] !== "undefined"){
             // Get Direction Symbol from KB.KD
@@ -149,6 +166,7 @@ export function mapDemo(){
             if(direction) GAME.MAP.playerQueue.push(new MAP.MapAction(MAP.mapactions.MOVE, direction));
             return;
         }
+
         // If the key is in KB.INVENTORY
         if(typeof KEYBINDINGS.INVENTORY[key] !== "undefined"){
             // Toggle the inventory box
@@ -162,6 +180,12 @@ export function mapDemo(){
                 inventoryBox.style.display = "none";
             }
         }
+    }
+    function handleCombatKeyPress(key){
+        
+    }
+
+    function handleInventoryKeyPress(key){
     }
 
     /**
@@ -178,21 +202,92 @@ export function mapDemo(){
     }
 
     /**
-     * Triggers a "fight" against a Bandit
+     * Assigns a combat object to GAME and begins the screen transition
+     * to the Combat Popup
+     * @param {Combat} combat - The Combat object to load
+     */
+    function loadCombat(combat){
+        // Register combat with GAME
+        GAME.COMBAT = combat
+        // Setup the Combat div
+        initializeCombatBox(combat);
+
+        // Add listeners
+        GAME.COMBAT.addEventListener("endcombat", finishCombat);
+        GAME.COMBAT.player.addEventListener("currentHPchange", combatUpdateHP);
+        GAME.COMBAT.enemy.addEventListener("currentHPchange", combatUpdateHP);
+
+        // Remove Hidden class
+        combatBox.classList.remove("hidden");
+        // Listen for the next animation to end
+        combatBox.addEventListener("animationend", startCombat);
+        // Add Shown class which will begin animating
+        combatBox.classList.add("shown");
+    }
+
+    /**
+     * Updates the displayed HP in response to HP change events
+     * @param {Evenet} event - Character.currentHPchange event
+     */
+    function combatUpdateHP(event){
+        // Figure out which character was hit
+        let chara = event.character == GAME.COMBAT.player ? "player": "enemy";
+        // Get box
+        let box = combatBox.querySelector(`div[data-combatant="${chara}"]`);
+        // Update hp
+        box.querySelector("span[data-hp]").textContent = event.currentHP;
+    }
+
+    /**
+     * Callback for the .popup.shown animation: removes the listener and starts the combatloop
+     * @param {Event} event - The animationend event
+     */
+    function startCombat(event){
+        // Stop listening for animations on Combat
+        combatBox.removeEventListener("animationend", startCombat);
+        // Start Combatloop
+        GAME.COMBAT.combatLoop();
+    }
+
+    /**
+     * Concludes combat and restores the UI to the Map view
+     */
+         function finishCombat(){
+            // Player lost
+            if(GAME.COMBAT.victor != GAME.COMBAT.player){
+                // Just call gameOver
+                return gameOver("Game Over! You were slain in combat!")
+            }
+            combatBox.classList.remove("shown");
+            combatBox.classList.add("hidden");
+        }
+
+    /**
+     * Triggers a "fight" against a Brigand
      */
     function portEvent(){
-
+        // Get Combat event
+        let event = EVENTS.buildCombatEncounter(GAME, 0, [{type: "resource", id: 2, qty: 10}]);
+        // Initialize it
+        let combat = event.initEncounter();
+        // Use laodCombat to display it on the screen
+        loadCombat(combat);
     }
 
     // Register callbacks
     document.addEventListener("keyup", handleKeyPress);
     GAME.MAP.addEventListener("move", reloadMap);
+
     GAME.PLAYER.addEventListener("itemschange", updateTravelResources);
     GAME.PLAYER.addEventListener("equipmentchange", updateTravelResources);
     GAME.MAP.addEventListener("entercolony", reloadResources);
     GAME.MAP.addEventListener("enterport", reloadResources);
     GAME.MAP.addEventListener("enterunexplored", portEvent);
 
+    function gameOver(message){
+        window.alert(message);
+        finishDemo();
+    }
 
     function finishDemo(){
         // Re-enable all buttons
@@ -200,9 +295,22 @@ export function mapDemo(){
 
         // Disable interface
         document.getElementById("quitMap").disabled = true;
-        document.removeEventListener("keyup", handleKeyPress);
+        document.removeEventListener("keyup", handleKeyPress);      
+        document.querySelectorAll("#combat button").forEach(button=>button.disabled=true);
 
+        // Remove listeners for Player
         GAME.PLAYER.removeAllListeners();
+        // Cleanup Combat if it's there
+        if(GAME.COMBAT){
+            // Remove listeners
+            GAME.COMBAT.removeAllListeners();
+            GAME.COMBAT.player.removeAllListeners();
+            GAME.COMBAT.enemy.removeAllListeners();
+            // Set victor to make sure that combatloop ends
+            GAME.COMBAT.victor = GAME.COMBAT.enemy;
+        }
+        // Make sure GAME.COMBAT is cleared
+        GAME.COMBAT = null;
     }
 
     // Enable Map Movement
