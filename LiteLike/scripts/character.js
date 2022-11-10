@@ -52,6 +52,10 @@ class Character extends Entity{
         }
     }
 
+    /**
+     * Applies and caps an HP change between 0 and max hp and notifies listeners
+     * @param {Number} value - HP Change
+     */
     adjustHP(value){
         // Don't do anything if hp hasn't changed
         if(!value) return;
@@ -59,6 +63,7 @@ class Character extends Entity{
         let hp = this.statistics.currentHP + value;
         // make sure to bound hp between 0 and hp
         this.statistics.currentHP = Math.max(0,Math.min(hp, this.statistics.hp));
+        // Notify listeners that HP has changed
         this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP});
     }
 }
@@ -193,10 +198,11 @@ export class CombatCharacter extends Character{
 
     /**
      * Calls updateState on all weapons in the Player's inventory
+     * @param {Number} now- The update time for the timers
      */
-    updateWeapons(){
+    updateWeapons(now){
         for(let weapon of this.weapons){
-            weapon.updateState();
+            weapon.updateTimers(now);
         }
     }
 

@@ -6,7 +6,6 @@ table[data-loadout] tr{
 }
 
 #combat{
-    position:absolute;
     display:inline-flex;
     float:left;
     flex-wrap:wrap;

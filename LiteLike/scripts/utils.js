@@ -216,8 +216,11 @@ export class Timer {
      * 
      * @param {Number} startTime - performance.now
      * @param {Number} rate - The time that elapses between cycles
+     * @param {Boolean} autofreeze - If true the Timer will automatically freeze when
+     *                                  calling updateCycles if cycles have been incremented.
+     *                                  Defaults to false.
      */
-    constructor(startTime, rate){
+    constructor(startTime, rate, autofreeze){
         this.startTime = startTime;
         this.rate = rate;
 
@@ -225,6 +228,8 @@ export class Timer {
 
         this.cycles = 0;
         this._collectFlag = false;
+        if(!autofreeze || typeof autofreeze == "undefined") autofreeze = false;
+        this.autofreeze = autofreeze;
     }
     
 
@@ -268,6 +273,13 @@ export class Timer {
      */
     clearReady(){
         this._collectFlag = false;
+    }
+
+    /**
+     * A function to force the timer into a ready state
+     */
+    setReady(){
+        this._collectFlag = 1;
     }
 
     /**
@@ -323,7 +335,22 @@ export class Timer {
 
             // Update cycles
             this.cycles = cycles;
+            
+            // If autofreeze and we've completed a cycle, freeze
+            if(this.autofreeze) this.freeze(now);
         }
+    }
+
+    /**
+     * Returns the amount of time that has elapsed in the current cycle
+     * @param {Number} now - performance.now
+     * @returns {Number} - time elapsed in the current cycle
+     */
+    cycleElapsed(now){
+        if(!now || typeof now == "undefined") now = UTILS.now();
+        // (now - this.startTime) is the total time this Timer has been running
+        // Modulo on this.rate to get the cycle remainder
+        return (now - this.startTime) % this.rate;
     }
 
         /**

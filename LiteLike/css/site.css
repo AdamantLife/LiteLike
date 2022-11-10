@@ -3,6 +3,7 @@ table.boldfirst tr>td:first-of-type{
 }
 
 .popup {
+    position:absolute;
     /* Centering and margins */
     left:10px;
     right:10px;

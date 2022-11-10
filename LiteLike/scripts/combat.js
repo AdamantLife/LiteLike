@@ -1,7 +1,7 @@
 "use strict";
 
 import * as UTILS from "./utils.js";
-import {weaponranges, weaponstates} from "./items.js";
+import {weaponranges} from "./items.js";
 
 /**
  * Description of a combat callback
@@ -64,6 +64,24 @@ export class Combat extends UTILS.EventListener{
         };
     }
 
+    prepareCombat(){
+        let now = UTILS.now();
+        // For each weapon in combat
+        for(let weapon of [...this.player.weapons, ...this.enemy.weapons]){
+            // For each Timer reset it with Now, then freeze it
+            weapon.cooldown.reset(now);
+            weapon.cooldown.freeze();
+            // For Cooldown, make sure it's ready
+            weapon.cooldown.setReady();
+            if(weapon.warmup){
+                weapon.warmup.reset(now);
+                weapon.warmup.freeze();
+                // For warmup, make sure it's not ready
+                weapon.warmup.clearReady();
+            }
+        }
+    }
+
     /**
      * Handles the combat loop, which involves placing player actions
      * and enemy actions on the stack and resolving them while checking
@@ -76,32 +94,59 @@ export class Combat extends UTILS.EventListener{
         // If combat is over, resolve combat and return
         if(this.victor !== null) return this.resolveCombat();
         
-        let playerCommands = [], enemeyActions = [];
+        let playerCommands = [], enemyActions = [];
 
         playerCommands = [...this.playerQueue];
 
         // Clear playerQueue
         this.playerQueue = [];
         
-        // Since we're modeling off of A Dark Room, the Enemey AI just spams
-        // attack afaik. For more sophisticated gameplay we would implement an
-        // actual AI
-        // Use first fireable weapon
-        let weapon = this.enemy.firstFireableWeapon();
-        // If no weapon is immediately fireable, use the first available one instead
-        weapon = weapon ? weapon : this.enemy.firstAvailableWeapon();
-        // If the AI has a weapon it can use, use it
-        if(weapon) enemeyActions.push(
-            new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player)
-            );
+        this.getEnemyAction(enemyActions);
 
-        this.combatStack(playerCommands, enemeyActions);
+        this.getCharged(playerCommands, enemyActions);
+
+        this.combatStack(playerCommands, enemyActions);
+
+        // Update the weapon's cycles
+        let now = UTILS.now();
+        this.player.updateWeapons(now);
+        this.enemy.updateWeapons(now);
 
         // Trigger endloop event
         this.triggerEvent(Combat.EVENTTYPES.endloop);
 
         // Set next timeout
         window.setTimeout(this.combatLoop.bind(this), UTILS.LOOPRATE);
+    }
+
+    /**
+     * In theory, we could handle different enemy AI's here
+     * However, since we're modeling off of A Dark Room, the Enemey AI just spams
+     * attack afaik.
+     * @param {CharacterAction[]} enemyActions - The enemy actions array
+     */
+    getEnemyAction(enemyActions){
+        // Get first available weapon
+        let weapon = this.enemy.firstAvailableWeapon();
+        // If the AI has a weapon it can use, use it
+        if(weapon) enemyActions.push(
+            new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player)
+            );
+    }
+
+    /**
+     * For both the player and the enemy, check if any weapons are fully charged and ready to fire
+     * and add them to the action arrays if they are
+     * @param {CharacterAction[]} playerCommands - The list of player commands to which Player Weapons that are fully charged will be added
+     * @param {CharacterAction[]} enemyActions - The list of enemy actions to which the enemy's charged weapons will be added
+     */
+    getCharged(playerCommands, enemyActions){
+        for(let weapon of this.player.weapons){
+            if(weapon.isFireable()) playerCommands.push(new CharacterAction(this.player, actiontypes.WEAPON, weapon, this.enemy));
+        }
+        for(let weapon of this.enemy.weapons){
+            if(weapon.isFireable()) enemyActions.push(new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player));
+        }
     }
 
     /**
@@ -124,12 +169,7 @@ export class Combat extends UTILS.EventListener{
              */
             if(this.handleKO()) return;
 
-        }        
-        // Update the state of all weapons
-        // Putting this after all other handleKO()s because weapons don't matter
-        // if combat is over
-        this.player.updateWeapons();
-        this.enemy.updateWeapons();
+        }
 
         // Trigger endstack event
         this.triggerEvent(Combat.EVENTTYPES.endstack);
@@ -144,9 +184,8 @@ export class Combat extends UTILS.EventListener{
         if(!weapon.isFireable()){
             // If the weapon is a warmup-type, then we will start charging it
             // if it is ready to be charged
-            if(weapon.weapontype.warmup && weapon.warmup === weaponstates.READY){
-                weapon.warmup = UTILS.now();
-
+            if(weapon.warmup && weapon.warmup.isFrozen){
+                weapon.warmup.unfreeze();
                 // Notify listeners that the weapon's warmup is being updated
                 this.triggerEvent(Combat.EVENTTYPES.useweapon, {action, result: "warmup", damage: null});
                 return;

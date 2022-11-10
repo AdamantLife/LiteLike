@@ -227,17 +227,12 @@ export function combatDemo(){
                 // Get the actual weapon
                 let weapon = chara.weapons[i];
                 // Check if the weapon is on Cooldown
-                if(weapon.cooldown !== EQUIP.weaponstates.READY){
+                if(!weapon.cooldown.isReady){
                     state = "ON COOLDOWN";
                 }else
                 // Check if the weapon is charging
                 if(weapon.isCharging()){
                     state = "CHARGING";
-                }else
-                // If warmup is not ready, output the warmup state
-                // warmup will always be READY for non-charging weapons
-                if(weapon.warmup != EQUIP.weaponstates.READY){
-                    state = weapon.warmup;
                 }
 
                 stateele.textContent = state;
@@ -287,5 +282,6 @@ export function combatDemo(){
     GAME.COMBAT.addEventListener("endstack", updateWeaponsItemsHP);
     GAME.COMBAT.addEventListener("endcombat", endCombat);
 
+    GAME.COMBAT.prepareCombat();
     GAME.COMBAT.combatLoop();
 }

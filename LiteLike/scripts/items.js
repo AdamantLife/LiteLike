@@ -5,16 +5,6 @@ import * as UTILS from "./utils.js";
 // Weapon Ranges
 export const weaponranges = UTILS.enumerate("MELEE", "RANGED");
 
-// State of the weapon based on Warmup and Cooldown
-export const weaponstates = UTILS.enumerate(
-    "CHARGING", // The weapon is warming up
-    "CHARGED", // The weapon was previously Charged and now is ready to deal damage
-    "FIRED", // The Weapon was previously Ready, Charged, or Charging and now needs its Cooldown updated
-    "READY" // The Weapon is off of cooldown and off of warmup
-    );
-
-/** TODO: Update Cooldowns to Timers */
-
 /**
  * A superclass for stackable items (items with quantities) and have weight
  */
@@ -78,7 +68,27 @@ export class WeaponType extends ShopItem{
 /**
  * A specific instance of a WeaponType
  * 
+ * Session 20 Update: all weapons are now charging weapons.
+ *   The rationale is that melee weapons and projectile weapon's animation
+ *   time can be linked to the charge timer. "Traditional" charging weapons
+ *   are intended to be animated differently. It's possible that an additional
+ *   weapontype attribute should be added to distinguish animation style.
+ * Weapons have 4 states:
+ *  On Cooldown: this.cooldown is not Ready, this.warmup is frozen and not ready
+ *  Pre Charging - this.cooldown is ready, this.warmup is frozen and not ready
+ *  Charging- this.cooldown is ready, this.warmup is not frozen and not ready
+ *  Charged (fireable)- this.cooldown is ready, this.warmup is frozen and is ready
+ * 
+ * Firing process:
+ *  Check if cooldown is ready-> If not it is not available
+ *  Make sure warmup is frozen and not ready -> If it is not frozen then it's charing
+ *                                           -> If it's ready, then it's fireable
+ *  unfreeze warmup -> Weapon begins charging
+ *  when warmup is ready -> weapon is fireable
+ *  
+ * 
  * TODO: Add Ammuniton-Type Weapons
+ * TODO: For Projectile-Type Weapons, consider creating a Projectile Item and delegating to that
  */
 export class Weapon {
     /**
@@ -87,8 +97,10 @@ export class Weapon {
      */
     constructor(weapontype){
         this.weapontype = weapontype;
-        this.cooldown = weaponstates.READY;
-        this.warmup = weaponstates.READY;
+        let now = UTILS.now();
+        this.cooldown = new UTILS.Timer(now, this.weapontype.cooldown, true);
+        // Create Warmup Timer only if weapontype.warmup, otherwise warmup is null
+        this.warmup = new UTILS.Timer(now, this.weapontype.warmup, true);
     }
 
     /**
@@ -96,17 +108,16 @@ export class Weapon {
      */
     isAvailable(){
         // The weapon is not on cooldown or charging
-        return this.cooldown === weaponstates.READY && this.warmup === weaponstates.READY;
+        return this.cooldown.isReady && this.warmup.isFrozen && !this.warmup.isReady;
     }
 
     /**
      * Returns whether the weapon is ready to fire
      */
      isFireable(){
-        // The weapon does not have a warmup is not on cooldown
-        return (!this.weapontype.warmup && this.cooldown === weaponstates.READY) ||
-        // or its warmup is complete
-        this.warmup === weaponstates.CHARGED;
+        // Not on cooldown and not a warmup weapon or
+        // Chargeable weapon only has a ready warmup when it's ready to fire
+        return this.cooldown.isReady && this.warmup.isReady
     }
 
     /**
@@ -115,82 +126,46 @@ export class Weapon {
      * return false
      */
     isCharging(){
-        // Weapon is not chargeable to begin with
-        if(!this.weapontype.warmup) return false;
-        // The weapon is charging if it's warmup is not in a defined state
-        // i.e.- it is a float representing a time
-        return Object.values(weaponstates.hasOwnProperty).indexOf(this.warmup) == -1;
+        // Weapon's warmup is only unfrozen when it's charging
+        return !this.warmup.isFrozen
     }
 
     /**
      * Updates the weapon's cooldown and warmup after it is fired
      */
     fire(){
-        this.cooldown = UTILS.now();
-        if(this.weapontype.warmup) this.warmup = weaponstates.FIRED;
+        // Can't fire weapon that is not fireable
+        if(!this.isFireable()) return;
+
+        // Start the cooldown timer on a new cycle
+        this.cooldown.clearReady();
+        this.cooldown.unfreeze();
+
+        // Clear the warmup ready flag (don't unfreeze)
+        this.warmup.clearReady();
     }
 
     /**
-     * Updates cooldown and warmup states
+     * Calls updateCycles on cooldown and warmup (if it exists)
+     * @param {Number} now - The update time for the timers
      */
-    updateState(){
-        let now = UTILS.now();
-        // If this.cooldown is not null, check if we can reset it
-        if(this.cooldown !== weaponstates.READY){
-            // If the difference between now and when the weapon cooldown was timestamped
-            // is longer than the weapontype's cooldown, we are no longer on cooldown
-            if((now - this.cooldown) > this.weapontype.cooldown) this.cooldown = weaponstates.READY;
-        }
-
-        // If this.warmup is not Ready, we may need to update it
-        if(this.warmup !== weaponstates.READY){
-            // The weapon was previously in the CHARGED state and has since been fired
-            // This check is relatively redundant with this.fire by design as
-            // we may change the charging mechanic in the future
-            if(this.warmup === weaponstates.FIRED){
-                this.warmup = weaponstates.READY;
-            }
-            // Warmup is not Ready or Fired, which leaves only CHARGED or a now()
-            // If it's not CHARGED, Weapon warmup timer has been started
-            else if(this.warmup !== weaponstates.CHARGED){
-                // Weapon is done warming up
-                if(this.warmupRemaining(now) <= 0) this.warmup = weaponstates.CHARGED;
-            }
-        }
+    updateTimers(now){
+        this.cooldown.updateCycles(now);
+        this.warmup.updateCycles(now);
     }
 
     /**
-     * Returns the difference between base warmup time and the time
-     * which has elapsed since warmup has started
-     * @param {Number} now - The current UTILS.now() result (ms since page load)
-     * @returns {Number | Infinity} - The amount of Warmup time remaining (in ms).
-     *                                  Infinity if the weapon is not warming up or can't warm up
-     */
-    warmupRemaining(now){
-        // For these first two checks, we might normally raise an error, but
-        // we're keeping it simple, so we'll just return Infinity
-
-        // Check that this weapon is actually a chargeable weapon
-        if(!this.weapontype.warmup) return Infinity;
-
-        // Makesure that the weapon is actually charging
-        if(!this.isCharging()) return Infinity;
-
-        // If now is not supplied, call it ourselves
-        // I'm doing this second since it costs more to call now() than to check
-        // this.warmup
-        if(typeof now === "undefined" || now === null) now = UTILS.now();
-
-        // Return the difference
-        return this.weapontype.warmup - (now - this.warmup);
-    }
-
-    /**
-     * Resets the weapon's cooldown and warmup values
+     * Set's the weapon's cooldown to Ready and the warmup (if it has one) to the frozen and unready state
      */
     clearState(){
-        this.cooldown = weaponstates.READY;
-        this.warmup = weaponstates.READY;
+        // Make sure both are frozen
+        if(!this.cooldown.isFrozen) this.warmup.freeze();
+        if(!this.warmup.isFrozen) this.warmup.freeze();
+
+        // Set cooldown to ready
+        this.cooldown.setReady();
+        // Set warmup to not ready
+        this.warmup.clearReady();
     }
 }
 

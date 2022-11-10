@@ -3,7 +3,7 @@
         { 
             "damage": 1,
             "cooldown": 1000,
-            "warmup": null,
+            "warmup": 0.5,
             "range": 0,
             "shopPrerequisites":[],
             "shopCost":[]

@@ -16,9 +16,10 @@ import * as UTILS from "./utils.js";
  */
 function heal(target, value){
     return (activator, opponent)=>{
-        let chara = activator;
+        let target = activator;
         if(target == "OPPONENT") target = opponent;
-        chara.statistics.currentHP = Math.min(chara.statistics.hp, chara.statistics.currentHP + value);
+        // Have target adjust its hp
+        target.adjustHP(value);
     }
 }
 
