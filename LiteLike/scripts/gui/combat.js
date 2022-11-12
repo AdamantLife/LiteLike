@@ -1,5 +1,6 @@
 import * as COMBAT from "../combat.js";
 import * as ITEMS from "../items.js";
+import * as CHARACTER from "../character.js";
 
 /**
  * @typedef {Object} WeaponEvent
@@ -87,7 +88,7 @@ export function useItem(character, item, opponent){
         // No weapon at loadout slot
         if(!weapon || typeof weapon == "undefined") continue;
         let weaponstring = IO.getStrings(GAME.STRINGS, weapon);
-        weaponstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`<button title="${weaponstring.flavor}">${weaponstring.name}</button>`);
+        weaponstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`<button title="${weaponstring.flavor}">${weaponstring.name}</button><div class="progressbar" data-duration></div>`);
         weaponstable.querySelector(`td[data-slot${i}]>button`).onclick = ()=>COMBATGUI.useWeapon(combat.player, weapon, combat.enemy);
     }
     let itemstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="items"]`);
@@ -96,7 +97,7 @@ export function useItem(character, item, opponent){
         // No Items at loadout slot
         if(!item || typeof item == "undefined") continue;
         let itemstring = IO.getStrings(GAME.STRINGS, item);
-        itemstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend', `<button title="${itemstring.flavor}">${itemstring.name}</button>`);
+        itemstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend', `<button title="${itemstring.flavor}">${itemstring.name}</button><div class="progressbar" data-duration></div>`);
         itemstable.querySelector(`td[data-slot${i}]>button`).onclick = ()=>COMBATGUI.useItem(combat.player, item, combat.enemy);
     }
 }
@@ -109,6 +110,8 @@ export function useItem(character, item, opponent){
      */
  export function loadCombat(combat, finishCombat){
     let combatBox = document.getElementById("combat");
+    let player = combat.player;
+    let enemy = combat.enemy;
     // Register combat with GAME
     GAME.COMBAT = combat
     // Setup the Combat div
@@ -119,6 +122,13 @@ export function useItem(character, item, opponent){
     // GUI Updates
     combat.addEventListener("warmup", updateInput);
     combat.addEventListener("damage", updateInput);
+    combat.addEventListener("useitem", updateInput);
+    //      These callbacks are to reenable the item when cooldown is done
+    player.addEventListener("equipmentchange", updateInput);
+    player.addEventListener("itemschange", updateInput);
+    enemy.addEventListener("equipmentchange", updateInput);
+    enemy.addEventListener("itemschange", updateInput);
+
     combat.player.addEventListener("currentHPchange", combatUpdateHP);
     combat.enemy.addEventListener("currentHPchange", combatUpdateHP);
     // Animations
@@ -154,7 +164,7 @@ function startCombat(event){
 
 /**
  * Updates the displayed HP in response to HP change events
- * @param {Evenet} event - Character.currentHPchange event
+ * @param {Event} event - Character.currentHPchange event
  */
  function combatUpdateHP(event){
     // Figure out which character was hit
@@ -163,6 +173,126 @@ function startCombat(event){
     let box = document.querySelector(`#combat div[data-combatant="${chara}"]`);
     // Update hp
     box.querySelector("span[data-hp]").textContent = event.currentHP;
+}
+
+/**
+ * Callback to update the input gui for items and weapons
+ * @param {WeaponEvent | ItemEvent} event - The weapon event for the weapon
+ */
+function updateInput(event){
+    // We'll ignore character.equipmentchange-> warmup (ready flag set) because
+    // we're more interested in when Combat clears the warmup ready flag
+    if(event.eventtype == CHARACTER.Character.EVENTTYPES.equipmentchange && event.type == "weapon" && event.subttype == "warmup") return;
+
+    // We need to establish these variables to know what we are updating
+    // subtype is "warmup", "activated", or "cooldown"
+    // the rest should be self-explanatory
+    let character, objecttype, object, subtype;
+
+    switch(event.eventtype){
+        case CHARACTER.Character.EVENTTYPES.equipmentchange:
+            // this event originates from the character itself
+            character = event.character;
+            // Object type is under event.type
+            objecttype = event.type;
+            // Weapon is under event.item
+            object = event.item;
+            // Subtype is listed for this event
+            subtype = event.subtype;
+            break;
+        case CHARACTER.Character.EVENTTYPES.itemschange:
+            // this event originates from the character itself
+            character = event.character;
+            // this should be a weapon event
+            objecttype = "item";
+            // Weapon is under event.item
+            object = event.item;
+            // Subtype is listed for this event
+            subtype = event.subtype;
+            break;
+        case COMBAT.Combat.EVENTTYPES.warmup:
+        case COMBAT.Combat.EVENTTYPES.damage:
+            // These are combat events, so refer to the characteraction
+            character = event.action.activator;
+            // These are weapon events
+            objecttype = "weapon";
+            // weapon is under event.weapon
+            object = event.weapon;
+            // Subtype can be determined based on eventtype
+            subtype = event.eventtype == COMBAT.Combat.EVENTTYPES.warmup ? "warmup" : "activated";
+            break;
+        case COMBAT.Combat.EVENTTYPES.itemuse:
+            // This is a combat event, so refer to the cahracteraction
+            character = event.action.activator;
+            // This is an item event
+            objecttype = "item";
+            // Object is under event.item
+            object = event.item;
+            // Subtype is always "activated" atm
+            subtype = "activated";            
+    }
+    // Determine the loadout based on objecttype
+    let loadout;
+    if(objecttype == "weapon") loadout = character.weapons;
+    else if (objecttype == "item") loadout = character.items;
+    // Per usual, return on errors
+    else{ return; }
+
+    // Find out what the object's index is
+    let index = loadout.indexOf(object);
+    // Figure out which character we're dealing with
+    character = character == GAME.COMBAT.player ? "player" : "enemy";
+    // We'll want a reference to the table data cell
+    let td = document.querySelector(`#combat div[data-combatant="${character}"] table[data-loadout="${objecttype}s"] td[data-slot${index}]`);
+
+    // The button to use/activate/attack with the weapon/item
+    let button = td.querySelector("button");
+    // The progress bar which indicates both warmup and cooldown
+    let progbar = td.querySelector("div.progressbar");
+
+    // Item has been activated, so start warmup
+    if(subtype == "activated"){
+        // Hide and disable button
+        button.style.display = "none";
+        button.disabled = true;
+        // Show progbar
+        progbar.style.display = "initial";
+        // Set progbar duration to warmup time
+        progbar.dataset.duration = object.warmup.rate;
+        // Make sure progbar does not have warmup or cooldown classes
+        // (it shouldn't, but just in case)
+        progbar.classList.remove("warmup", "cooldown");
+        // Set progbar to show warmup
+        progbar.classList.add("warmup");
+    }
+    // Item has finished warmup, so begin cooldown
+    else if (subtype == "warmup"){
+        // Button should already be hidden and disabled, but just in case
+        button.style.display = "none";
+        button.disabled = true;
+        // Likewise, progbar should already be Shown
+        progbar.style.display = "initial";
+        // Set progbar duration to cooldown time
+        progbar.dataset.duration = object.cooldown.rate;
+        // Make sure progbar does not have warmup or cooldown classes
+        progbar.classList.remove("warmup", "cooldown");
+        // Set progbar to show cooldown
+        progbar.classList.add("cooldown");
+    }
+    // Item has finished cooldown, so reenable
+    else if (subttype == "cooldown"){
+        // Show and enable button
+        button.style.display = "initial";
+        button.disabled = false;
+        // Hide progbar
+        progbar.style.display = "none";
+        // We're not going to bother to change duration
+
+        // Make sure progbar does not have warmup or cooldown classes
+        progbar.classList.remove("warmup", "cooldown");
+    }
+    // As usual, don't do anything on invalid data
+    else{ return; }
 }
 
 /**

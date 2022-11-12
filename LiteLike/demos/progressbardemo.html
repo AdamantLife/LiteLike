@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<head>
+    <link rel="stylesheet" type="text/css" href="/LITELIKE/css/combat.css"/>
+</head>
+<body>
+    <div id="progbar" class="progressbar" data-warmup="3s" data-cooldown="5s"><div class="inner"></div></div>
+
+    <button id="activatebutton" onclick="activate();">Activate</button>
+    <script>
+        var PROGBAR = document.getElementById("progbar");
+        var INNER = PROGBAR.querySelector("div.inner");
+        var ACTIVATE = document.getElementById("activatebutton");
+
+        function activate(){
+            ACTIVATE.disabled = true;
+            console.log('here')
+            INNER.style.animationDuration = PROGBAR.dataset.warmup;
+            console.log('here')
+            PROGBAR.classList.add("warmup");
+        }
+
+        /**
+         * Progresses the demo from one animation to the next, reeanabling
+         * the activate button when it's done
+         * @param {event} - animationend event
+         */
+        function progressDemo(event){
+            // Just finished warmup
+            if(PROGBAR.classList.contains("warmup")){
+                PROGBAR.classList.remove("warmup");
+                INNER.style.animationDuration = PROGBAR.dataset.cooldown;
+                PROGBAR.classList.add("cooldown");
+            }
+            // Just finished cooldown
+            else if (PROGBAR.classList.contains("cooldown")){
+                PROGBAR.classList.remove("cooldown");
+                ACTIVATE.disabled = false;
+            }
+        }
+        (()=>{
+            PROGBAR.addEventListener("animationend", progressDemo);
+        })();
+    </script>
+</body>

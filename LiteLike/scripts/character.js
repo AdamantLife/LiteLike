@@ -39,7 +39,7 @@ class Entity{
  * A workaround to implment multiple inheritances for Characters 
  * which should extend both Entity and EventListener
  */
-class Character extends Entity{
+export class Character extends Entity{
     static EVENTTYPES = UTILS.enumerate("equipmentchange", "itemschange", "resourceschange", "hpchange", "currentHPchange");
     constructor(id, roles){
         super(id, roles);
@@ -50,6 +50,19 @@ class Character extends Entity{
         for(let prop of ["addEventListener", "removeEventListener", "removeAllListeners", "triggerEvent"]){
             this[prop] = this.eventlistener[prop].bind(this.eventlistener);
         }
+    }
+
+    /**
+     * ALl character events should return the given data at minimum
+     * @returns {Object} - The default event data
+     */
+    getDefaultEventData(){
+        // Just in case Character changes in the future, make sure we're getting all parent data
+        let base = super.getDefaultEventData();
+        // Update with the data we want
+        Object.assign(base, {character: this})
+        // Return the base (which has been updated in place)
+        return base;
     }
 
     /**
@@ -197,12 +210,28 @@ export class CombatCharacter extends Character{
     }
 
     /**
-     * Calls updateState on all weapons in the Player's inventory
-     * @param {Number} now- The update time for the timers
+     * Calls updateTimers on the Character's weapon loadout
+     * @param {Number} now- Performance.now
      */
     updateWeapons(now){
-        for(let weapon of this.weapons){
+        for(let weapon of this.weapons.slice(0,CHARAWEAPONLOADOUT)){
+            let cooldown = weapon.cooldown.isReady;
+            let warmup = weapon.warmup.isReady;
             weapon.updateTimers(now);
+            if(weapon.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {type: "weapon", subtype: "timer", item: weapon, timer: "cooldown"});
+            if(weapon.warmup.isReady != warmup) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {type: "weapon", subtype: "timer", item: weapon, timer: "warmup"});
+        }
+    }
+
+    /**
+     * Calls updateTimer on the Character's item loadout
+     * @param {Number} now - Performance.now
+     */
+    updateItems(now){
+        for(let item of this.items.slice(0,CHARAITEMLOADOUT)){
+            let cooldown = item.cooldown.isReady;
+            item.updateTimer(now);
+            if(item.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.itemschange, {type: "item", subtype: "timer", item, timer: "cooldown"});
         }
     }
 

@@ -99,7 +99,7 @@ export function mapDemo(){
         // Get String-Name of the key
         let key = event.key;
         // Combat is displayed, so only handle input for combat
-        if(combatBox.classList.contains("shown")) return COMBATGUI.handleCombatKeyPress(key);
+        if(combatBox.classList.contains("shown")) return COMBATGUI.handleCombatKeyPress(event);
         // Inventory is displayed, so only handle input for Inventory
         if(inventoryBox.classList.contains("shown")) return handleInventoryKeyPress(key);
 
@@ -149,24 +149,24 @@ export function mapDemo(){
     /**
      * Concludes combat and restores the UI to the Map view
      */
-         function finishCombat(){
-            // Player lost
-            if(GAME.COMBAT.victor != GAME.COMBAT.player){
-                // Just call gameOver
-                return gameOver("Game Over! You were slain in combat!")
-            }
-
-            // Clear all listeners
-            GAME.COMBAT.removeAllListeners();
-            GAME.player.removeAllListeners();
-            GAME.enemy.removeAllListeners();
-            // Clear combat from Game
-            GAME.COMBAT = null;
-
-            // Hide combatBox
-            combatBox.classList.remove("shown");
-            combatBox.classList.add("hidden");
+        function finishCombat(){
+        // Player lost
+        if(GAME.COMBAT.victor != GAME.COMBAT.player){
+            // Just call gameOver
+            return gameOver("Game Over! You were slain in combat!")
         }
+
+        // Clear all listeners
+        GAME.COMBAT.removeAllListeners();
+        GAME.player.removeAllListeners();
+        GAME.enemy.removeAllListeners();
+        // Clear combat from Game
+        GAME.COMBAT = null;
+
+        // Hide combatBox
+        combatBox.classList.remove("shown");
+        combatBox.classList.add("hidden");
+    }
 
     /**
      * Triggers a "fight" against a Brigand

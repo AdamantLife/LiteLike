@@ -17,3 +17,50 @@ table[data-loadout] tr{
     width:50%;
     min-width: 25em;
 }
+
+
+.progressbar{
+    width:5em;
+    height:1em;
+    border-radius: 1em;
+    border: 3px solid;
+    overflow: hidden;
+}
+.inner{
+    width:0px;
+    height:100%;
+}
+
+.progressbar.warmup>div.inner{
+    animation-name: warmup;
+    animation-timing-function: linear;
+    animation-delay: 0s;
+}
+
+    @keyframes warmup {
+        from {
+            background-color: yellow;
+            width:0px;
+        }
+        to{
+            background-color: red;
+            width:100%;
+        }
+    }
+
+.progressbar.cooldown>div.inner{
+    animation-name: cooldown;
+    animation-timing-function: linear;
+    animation-delay: 0s;
+}
+
+    @keyframes cooldown {
+        from {
+            background-color: red;
+            width:100%;
+        }
+        to{
+            background-color: blue;
+            width:0px;
+        }
+    }

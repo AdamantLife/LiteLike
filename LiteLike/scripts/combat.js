@@ -107,10 +107,12 @@ export class Combat extends UTILS.EventListener{
 
         this.combatStack(playerCommands, enemyActions);
 
-        // Update the weapon's cycles
+        // Update the weapons and items cycles
         let now = UTILS.now();
         this.player.updateWeapons(now);
+        this.player.updateItems(now);
         this.enemy.updateWeapons(now);
+        this.enemy.updateItems(now);
 
         // Trigger endloop event
         this.triggerEvent(Combat.EVENTTYPES.endloop);

@@ -99,7 +99,6 @@ export class Weapon {
         this.weapontype = weapontype;
         let now = UTILS.now();
         this.cooldown = new UTILS.Timer(now, this.weapontype.cooldown, true);
-        // Create Warmup Timer only if weapontype.warmup, otherwise warmup is null
         this.warmup = new UTILS.Timer(now, this.weapontype.warmup, true);
     }
 
@@ -235,12 +234,24 @@ export class Item extends Stackable{
     constructor(itemtype, quantity){
         super(quantity, itemtype.weight);
         this.itemtype = itemtype
-        this.cooldown = null;
+        this.cooldown = new UTILS.Timer(UTILS.now(), this.itemtype.cooldown, true);
     }
 
     use(){
         // If this item is consumable, remove a quantity (min. 0 after removing)
         if(this.itemtype.isConsumable) this.quantity = Math.max(this.quantity - 1, 0);
+
+        // Begin cooldown
+        this.cooldown.clearReady();
+        this.cooldown.unfreeze();
+    }
+
+    /**
+     * Updates the cooldown timer
+     * @param {Number} now - performance.now
+     */
+    updateTimer(now){
+        this.cooldown.updateCycles(now);
     }
 }
 

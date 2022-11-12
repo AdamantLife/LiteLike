@@ -195,6 +195,9 @@ export class EventListener{
         if(additional && typeof additional !== "undefined"){
             Object.assign(event,additional);
         }
+        // Include eventtype for reference
+        event.eventtype = eventtype;
+        
         for(let listener of this._listeners[eventtype]){
             let result = listener(event);
             if(result === false) return;

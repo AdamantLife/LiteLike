@@ -16,10 +16,10 @@ import * as UTILS from "./utils.js";
  */
 function heal(target, value){
     return (activator, opponent)=>{
-        let target = activator;
-        if(target == "OPPONENT") target = opponent;
+        let chara = activator;
+        if(target == "OPPONENT") chara = opponent;
         // Have target adjust its hp
-        target.adjustHP(value);
+        chara.adjustHP(value);
     }
 }
 
