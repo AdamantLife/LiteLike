@@ -3,8 +3,8 @@
         { 
             "damage": 1,
             "cooldown": 1000,
-            "warmup": 0.5,
-            "range": 0,
+            "warmup": 500,
+            "range": "MELEE",
             "shopPrerequisites":[],
             "shopCost":[]
         },
@@ -12,7 +12,7 @@
             "damage": 2,
             "cooldown": 1000,
             "warmup": 1000,
-            "range": 1,
+            "range": "RANGED",
             "shopPrerequisites":[],
             "shopCost":[]
         }

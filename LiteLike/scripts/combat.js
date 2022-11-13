@@ -73,12 +73,12 @@ export class Combat extends UTILS.EventListener{
             weapon.cooldown.freeze();
             // For Cooldown, make sure it's ready
             weapon.cooldown.setReady();
-            if(weapon.warmup){
-                weapon.warmup.reset(now);
-                weapon.warmup.freeze();
-                // For warmup, make sure it's not ready
-                weapon.warmup.clearReady();
-            }
+
+            // Do the same for warmup
+            weapon.warmup.reset(now);
+            weapon.warmup.freeze();
+            // For warmup, make sure it's not ready
+            weapon.warmup.clearReady();
         }
     }
 

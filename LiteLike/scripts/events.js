@@ -4,6 +4,7 @@ import * as UTILS from "./utils.js";
 import {Combat} from "./combat.js";
 import * as ITEMS from "./items.js";
 import { unlocks } from "./colony.js";
+import { createCombatant } from "./io.js";
 
 export const encountertype = UTILS.enumerate("combat","choice", "none");
 export const reward = UTILS.enumerate("item", "unlock" , "map" );
@@ -112,7 +113,7 @@ export function buildCombatEncounter(game, enemy, rewards, options){
     let tier = options.tier && options.tier !== "undefined" ? options.tier : 1;
 
     // TODO: Random Encounter
-    enemy = game.EVENTS.combatants[enemy];
+    enemy =createCombatant(enemy, game.EVENTS.combatants, GAME.ITEMS);
     // Invalid Enemy ID
     if(!enemy || typeof enemy == "undefined") return;
     

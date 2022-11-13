@@ -10,13 +10,14 @@ export const CHARAITEMLOADOUT = 3;
 /**
  * An individual entity within the game
  */
-class Entity{
+class Entity extends UTILS.EventListener{
     /**
      * Initializes a new Entity
      * @param {Number} id - The enumerated id of this specific Entity
      * @param {Symbol[]} roles - A list of roles to add to this Entity on creation
      */
-    constructor(id, roles){
+    constructor(events,id, roles){
+        super(events);
         this.id = id;
         this._roles = [];
         for(let role of roles)this.addRole(role);
@@ -42,14 +43,7 @@ class Entity{
 export class Character extends Entity{
     static EVENTTYPES = UTILS.enumerate("equipmentchange", "itemschange", "resourceschange", "hpchange", "currentHPchange");
     constructor(id, roles){
-        super(id, roles);
-        this.eventlistener = new UTILS.EventListener(Character.EVENTTYPES);
-
-        if(typeof this.getDefaultEventData !== "undefined")this.eventlistener.getDefaultEventData = this.getDefaultEventData;
-
-        for(let prop of ["addEventListener", "removeEventListener", "removeAllListeners", "triggerEvent"]){
-            this[prop] = this.eventlistener[prop].bind(this.eventlistener);
-        }
+        super(Character.EVENTTYPES, id, roles);
     }
 
     /**
@@ -72,12 +66,14 @@ export class Character extends Entity{
     adjustHP(value){
         // Don't do anything if hp hasn't changed
         if(!value) return;
+        // Need initial hp to put in the event
+        let initialHP = this.statistics.currentHP;
         // get new hp
         let hp = this.statistics.currentHP + value;
         // make sure to bound hp between 0 and hp
         this.statistics.currentHP = Math.max(0,Math.min(hp, this.statistics.hp));
         // Notify listeners that HP has changed
-        this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP});
+        this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP, initialHP, rawchange: value});
     }
 }
 
@@ -218,8 +214,8 @@ export class CombatCharacter extends Character{
             let cooldown = weapon.cooldown.isReady;
             let warmup = weapon.warmup.isReady;
             weapon.updateTimers(now);
-            if(weapon.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {type: "weapon", subtype: "timer", item: weapon, timer: "cooldown"});
-            if(weapon.warmup.isReady != warmup) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {type: "weapon", subtype: "timer", item: weapon, timer: "warmup"});
+            if(weapon.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {subtype: "timer", item: weapon, timer: "cooldown"});
+            if(weapon.warmup.isReady != warmup) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {subtype: "timer", item: weapon, timer: "warmup"});
         }
     }
 
@@ -231,7 +227,7 @@ export class CombatCharacter extends Character{
         for(let item of this.items.slice(0,CHARAITEMLOADOUT)){
             let cooldown = item.cooldown.isReady;
             item.updateTimer(now);
-            if(item.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.itemschange, {type: "item", subtype: "timer", item, timer: "cooldown"});
+            if(item.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.itemschange, {subtype: "timer", item, timer: "cooldown"});
         }
     }
 

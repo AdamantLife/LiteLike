@@ -1,6 +1,10 @@
+"use-strict";
+
 import * as COMBAT from "../combat.js";
 import * as ITEMS from "../items.js";
 import * as CHARACTER from "../character.js";
+import * as IO from "../io.js";
+import * as GUI from "./site.js";
 
 /**
  * @typedef {Object} WeaponEvent
@@ -52,25 +56,37 @@ export function useItem(character, item, opponent){
  */
  export function initializeCombatBox(combat){
 
-    function buildStatBlock(chara){
+    /**
+     * Creates a Character's Stat Block for display in the Combat Window
+     * @param {CHARACTER.Character} chara - Character to get display strings for
+     * @param {Boolean} weapons - Whether or not to display the weapons table
+     * @param {Boolean} items - Whether or not to display the items table
+     * @returns {String} - an html string to insert into the Combat Window
+     */
+    function buildStatBlock(chara, weapons, items){
         let charaString = IO.getStrings(GAME.STRINGS, chara);
+
+        let weapontable = weapons ? `<h3>Weapons</h3>
+        <table data-loadout="weapons"><tbody>
+        <tr><td data-slot0></td><td></td><td data-slot1></td></tr>
+        <tr><td></td><td data-slot2></td><td></td></tr>
+        <tr><td data-slot3></td><td></td><td data-slot4></td></tr>
+        </tbody></table>` : ""
+
+        let itemtable = items ? `<h3>Items</h3>
+        <table data-loadout="items"><tbody>
+        <tr><td data-slot0></td><td data-slot1></td><td data-slot2></td></tr>
+        </tbody></table>` : "";
+
         return `
-<div class="character" data-combatant="${chara.roles.indexOf(CHARA.roles.PLAYER) >= 0 ? "player" : "enemy"}">
-<h1 title="${charaString.flavor}">${charaString.name}</h1>
+<div class="character" data-combatant="${chara.roles.indexOf(CHARACTER.roles.PLAYER) >= 0 ? "player" : "enemy"}">
+<div><h1>&nbsp;</h1></div><h1 title="${charaString.flavor}">${charaString.name}</h1>
 <table class="boldfirst"><tbody>
-<tr><td>HP</td><td><span data-hp>${chara.statistics.currentHP}</span>/${chara.statistics.hp}</td></tr>
+<tr><td>HP</td><td><div style="display:inline-block;position:relative;width:3em;">&nbsp;<div data-hp style="position:absolute;width:100%;text-align:right;top:0;">${chara.statistics.currentHP}</div></div><div style="display:inline-block;">/${chara.statistics.hp}</div></td></tr>
 </tbody></table>
-<h3>Weapons</h3>
-<table data-loadout="weapons"><tbody>
-<tr><td data-slot0></td><td></td><td data-slot1></td></tr>
-<tr><td></td><td data-slot2></td><td></td></tr>
-<tr><td data-slot3></td><td></td><td data-slot4></td></tr>
-</tbody></table>
-<h3>Items</h3>
-<table data-loadout="items"><tbody>
-<tr><td data-slot0></td><td data-slot1></td><td data-slot2></td></tr>
-</table></tbody>
-</div>`
+${weapontable}
+${itemtable}
+</div>`;
     }
 
     let combatBox = document.getElementById("combat");
@@ -78,28 +94,56 @@ export function useItem(character, item, opponent){
     // Clear combatBox
     while(combatBox.lastElementChild) combatBox.removeChild(combatBox.lastElementChild);
     // Insert Player Character
-    combatBox.insertAdjacentHTML('beforeend', buildStatBlock(combat.player));
+    combatBox.insertAdjacentHTML('beforeend', buildStatBlock(combat.player, true, true));
     // Insert Enemy Character
-    combatBox.insertAdjacentHTML('beforeend', buildStatBlock(combat.enemy));
+    // NOTE: currently we are never displaying weapons or items for enemy
+    combatBox.insertAdjacentHTML('beforeend', buildStatBlock(combat.enemy, false, false));
 
-    let weaponstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="weapons"]`);
-    for(let i = 0; i < CHARA.CHARAWEAPONLOADOUT; i++){
-        let weapon = combat.player.weapons[i];
-        // No weapon at loadout slot
-        if(!weapon || typeof weapon == "undefined") continue;
-        let weaponstring = IO.getStrings(GAME.STRINGS, weapon);
-        weaponstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`<button title="${weaponstring.flavor}">${weaponstring.name}</button><div class="progressbar" data-duration></div>`);
-        weaponstable.querySelector(`td[data-slot${i}]>button`).onclick = ()=>COMBATGUI.useWeapon(combat.player, weapon, combat.enemy);
+    // Loadout population is repetative, so we're combining everything
+    // We start out per-character
+    for(let character of [combat.player, combat.enemy]){
+        // Get weapons and items table to populate for the character
+        let weaponstable = combatBox.querySelector(`div[data-combatant="${character == combat.player ? 'player': 'enemy'}"] table[data-loadout="weapons"]`);
+        let itemstable = combatBox.querySelector(`div[data-combatant="${character == combat.player ? 'player': 'enemy'}"] table[data-loadout="items"]`);
+
+        // Both tables are popuplated the same way, but we need to know where to find the loadout,
+        // how much of each loadout to populate, and what happens when the button is pushed
+        for( let [table, loadout, loadoutlength, callback] of [
+            [weaponstable, combat.player.weapons, CHARACTER.CHARAWEAPONLOADOUT, useWeapon],
+            [itemstable, combat.player.items, CHARACTER.CHARAITEMLOADOUT, useItem]
+        ]){
+            // If table is not displayed, skip populating the loadout
+            // NOTE: Currently we are never displaying the enemy weapons or items
+            if(!table) continue
+
+            // Populate each object of the loadout
+            for(let i = 0; i < loadoutlength; i++){
+                // Get the object to populate
+                let object = loadout[i];
+
+                // That slot is empty
+                if(!object || typeof object == "undefined") continue;
+
+                // Get readable strings
+                let strings = IO.getStrings(GAME.STRINGS, object);
+
+                // Add Activation button and progress (warmup/cooldown) bar
+                table.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend',`
+    <button title="${strings.flavor}">${strings.name}</button><div class="progressbar"><div class="inner"></div></div>
+    `);
+                // Connect button to callback
+                table.querySelector(`td[data-slot${i}]>button`).onclick = ()=>callback(combat.player, object, combat.enemy);
+
+                // Start combat with just the activation button visable
+                table.querySelector(`td[data-slot${i}]>div.progressbar`).style.display = "none";
+            }
+
+        }
+
     }
-    let itemstable = combatBox.querySelector(`div[data-combatant="player"] table[data-loadout="items"]`);
-    for(let i = 0; i < CHARA.CHARAITEMLOADOUT; i++){
-        let item = combat.player.items[i];
-        // No Items at loadout slot
-        if(!item || typeof item == "undefined") continue;
-        let itemstring = IO.getStrings(GAME.STRINGS, item);
-        itemstable.querySelector(`td[data-slot${i}]`).insertAdjacentHTML('beforeend', `<button title="${itemstring.flavor}">${itemstring.name}</button><div class="progressbar" data-duration></div>`);
-        itemstable.querySelector(`td[data-slot${i}]>button`).onclick = ()=>COMBATGUI.useItem(combat.player, item, combat.enemy);
-    }
+    
+
+    
 }
 
 /**
@@ -116,24 +160,27 @@ export function useItem(character, item, opponent){
     GAME.COMBAT = combat
     // Setup the Combat div
     initializeCombatBox(combat);
+    combat.prepareCombat();
+
+    // We'll be attaching listeners to the character's names
+    let playername = combatBox.querySelector(`div[data-combatant="player"]>h1`);
+    let enemyname = combatBox.querySelector(`div[data-combatant="player"]>h1`);
 
     // Add listeners
     combat.addEventListener("endcombat", finishCombat);
     // GUI Updates
-    combat.addEventListener("warmup", updateInput);
-    combat.addEventListener("damage", updateInput);
+    combat.addEventListener("useweapon", updateInput);
     combat.addEventListener("useitem", updateInput);
     //      These callbacks are to reenable the item when cooldown is done
     player.addEventListener("equipmentchange", updateInput);
     player.addEventListener("itemschange", updateInput);
-    enemy.addEventListener("equipmentchange", updateInput);
-    enemy.addEventListener("itemschange", updateInput);
 
     combat.player.addEventListener("currentHPchange", combatUpdateHP);
     combat.enemy.addEventListener("currentHPchange", combatUpdateHP);
     // Animations
-    combat.addEventListener("warmup", animateAttack);
-    combat.addEventListener("damage", animateAttack);
+    combat.addEventListener("useweapon", animateAttack);
+    playername.addEventListener("animationend", clearAnimation);
+    enemyname.addEventListener("animationend", clearAnimation);
 
     
 
@@ -172,7 +219,13 @@ function startCombat(event){
     // Get box
     let box = document.querySelector(`#combat div[data-combatant="${chara}"]`);
     // Update hp
-    box.querySelector("span[data-hp]").textContent = event.currentHP;
+    let hp = box.querySelector("div[data-hp]")
+    hp.textContent = event.currentHP;
+    // Set color based on hp change (red = Damage, green = Heal)
+    let color = event.rawchange < 0 ? "#f00" : "#0f0";
+    // Flash HP to indicate hp change
+    GUI.flashText(hp, {duration : 250, color});
+    GUI.swellText(hp, {duration : 250*3});
 }
 
 /**
@@ -180,9 +233,10 @@ function startCombat(event){
  * @param {WeaponEvent | ItemEvent} event - The weapon event for the weapon
  */
 function updateInput(event){
+
     // We'll ignore character.equipmentchange-> warmup (ready flag set) because
     // we're more interested in when Combat clears the warmup ready flag
-    if(event.eventtype == CHARACTER.Character.EVENTTYPES.equipmentchange && event.type == "weapon" && event.subttype == "warmup") return;
+    if(event.eventtype == CHARACTER.Character.EVENTTYPES.equipmentchange && event.item.constructor.name == "Weapon" && event.timer == "warmup") return;
 
     // We need to establish these variables to know what we are updating
     // subtype is "warmup", "activated", or "cooldown"
@@ -193,12 +247,12 @@ function updateInput(event){
         case CHARACTER.Character.EVENTTYPES.equipmentchange:
             // this event originates from the character itself
             character = event.character;
-            // Object type is under event.type
-            objecttype = event.type;
-            // Weapon is under event.item
+            // Object is under event.item
             object = event.item;
+            // make sure that objecttype is weapon
+            objecttype = object.constructor.name ==  "Weapon"? "weapon" : null;
             // Subtype is listed for this event
-            subtype = event.subtype;
+            subtype = event.timer;
             break;
         case CHARACTER.Character.EVENTTYPES.itemschange:
             // this event originates from the character itself
@@ -208,29 +262,31 @@ function updateInput(event){
             // Weapon is under event.item
             object = event.item;
             // Subtype is listed for this event
-            subtype = event.subtype;
+            subtype = event.timer;
             break;
-        case COMBAT.Combat.EVENTTYPES.warmup:
-        case COMBAT.Combat.EVENTTYPES.damage:
+        case COMBAT.Combat.EVENTTYPES.useweapon:
             // These are combat events, so refer to the characteraction
             character = event.action.activator;
             // These are weapon events
             objecttype = "weapon";
-            // weapon is under event.weapon
-            object = event.weapon;
-            // Subtype can be determined based on eventtype
-            subtype = event.eventtype == COMBAT.Combat.EVENTTYPES.warmup ? "warmup" : "activated";
+            // weapon is under event.action.object
+            object = event.action.object;
+            // Subtype can be determined based on result
+            subtype = event.result == "warmup" ? "activated" : "warmup";
             break;
-        case COMBAT.Combat.EVENTTYPES.itemuse:
+        case COMBAT.Combat.EVENTTYPES.useitem:
             // This is a combat event, so refer to the cahracteraction
             character = event.action.activator;
             // This is an item event
             objecttype = "item";
             // Object is under event.item
             object = event.item;
-            // Subtype is always "activated" atm
-            subtype = "activated";            
-    }
+            // Subtype is always "warmup" atm
+            subtype = "warmup";            
+    }    
+    // We are currently not displaying enemy weapon/item use
+    if(character == GAME.COMBAT.enemy) return;
+
     // Determine the loadout based on objecttype
     let loadout;
     if(objecttype == "weapon") loadout = character.weapons;
@@ -240,15 +296,20 @@ function updateInput(event){
 
     // Find out what the object's index is
     let index = loadout.indexOf(object);
+
     // Figure out which character we're dealing with
     character = character == GAME.COMBAT.player ? "player" : "enemy";
+
     // We'll want a reference to the table data cell
     let td = document.querySelector(`#combat div[data-combatant="${character}"] table[data-loadout="${objecttype}s"] td[data-slot${index}]`);
 
     // The button to use/activate/attack with the weapon/item
     let button = td.querySelector("button");
-    // The progress bar which indicates both warmup and cooldown
+    // Get the outer part of the progressbar so we can show/hide it
     let progbar = td.querySelector("div.progressbar");
+    // Get the inner (colored) part of the progressbar so we can set its animation time
+    // to correspond to warmup/cooldown
+    let inner = progbar.querySelector("div.inner");
 
     // Item has been activated, so start warmup
     if(subtype == "activated"){
@@ -256,9 +317,9 @@ function updateInput(event){
         button.style.display = "none";
         button.disabled = true;
         // Show progbar
-        progbar.style.display = "initial";
+        progbar.style.display = "block";
         // Set progbar duration to warmup time
-        progbar.dataset.duration = object.warmup.rate;
+        inner.style.animationDuration = object.warmup.rate+"ms";
         // Make sure progbar does not have warmup or cooldown classes
         // (it shouldn't, but just in case)
         progbar.classList.remove("warmup", "cooldown");
@@ -271,18 +332,18 @@ function updateInput(event){
         button.style.display = "none";
         button.disabled = true;
         // Likewise, progbar should already be Shown
-        progbar.style.display = "initial";
+        progbar.style.display = "block";
         // Set progbar duration to cooldown time
-        progbar.dataset.duration = object.cooldown.rate;
+        inner.style.animationDuration = object.cooldown.rate+"ms";
         // Make sure progbar does not have warmup or cooldown classes
         progbar.classList.remove("warmup", "cooldown");
         // Set progbar to show cooldown
         progbar.classList.add("cooldown");
     }
     // Item has finished cooldown, so reenable
-    else if (subttype == "cooldown"){
+    else if (subtype == "cooldown"){
         // Show and enable button
-        button.style.display = "initial";
+        button.style.display = "inline-block";
         button.disabled = false;
         // Hide progbar
         progbar.style.display = "none";
@@ -319,13 +380,13 @@ function animateAttack(event){
  */
 function animateWarmup(event){
     function animateSwing(){
-
+        charactername.style.animationDuration=event.action.object.warmup.rate+"ms";
+        characterblock.classList.add("swing");
     }
-    function animateCharge(){
-
-    }
-    if(event.weapon.weapontype.range == ITEMS.weaponranges.MELEE) return animateSwing();
-    if(event.weapon.weapontype.range == ITEMS.weaponranges.RANGE) return animateCharge();
+    let character = event.action.activator == GAME.COMBAT.player ? "player" : "enemy";
+    let characterblock = document.querySelector(`#combat>div[data-combatant="${character}"]`);
+    let charactername = document.querySelector(`#combat>div[data-combatant="${character}"]>h1`);
+    if(ITEMS.weaponranges[event.action.object.weapontype.range] == ITEMS.weaponranges.MELEE) return animateSwing();
 }
 
 
@@ -335,4 +396,18 @@ function animateWarmup(event){
  */
 function animateDamage(event){
 
+}
+
+/**
+ * Clears the finished animation classes
+ */
+function clearAnimation(event){
+    switch(event.animationName){
+        case "playerswing":
+            document.querySelector(`#combat>div[data-combatant="player"]`).classList.remove("swing");
+            break;
+        case "enemyswing":
+            document.querySelector(`#combat>div[data-combatant="enemy"]`).classList.remove("swing");
+            break;
+    }
 }

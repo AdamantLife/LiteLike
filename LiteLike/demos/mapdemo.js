@@ -103,7 +103,6 @@ export function mapDemo(){
         // Inventory is displayed, so only handle input for Inventory
         if(inventoryBox.classList.contains("shown")) return handleInventoryKeyPress(key);
 
-        console.log('moving')
         // Otherwise, we're on the map view, so handle map-only inputs
         // If the key is in KB.KEYDIRECTIONS 
         if(typeof KEYBINDINGS.KEYDIRECTIONS[key] !== "undefined"){
@@ -158,8 +157,8 @@ export function mapDemo(){
 
         // Clear all listeners
         GAME.COMBAT.removeAllListeners();
-        GAME.player.removeAllListeners();
-        GAME.enemy.removeAllListeners();
+        GAME.COMBAT.player.removeAllListeners();
+        GAME.COMBAT.enemy.removeAllListeners();
         // Clear combat from Game
         GAME.COMBAT = null;
 

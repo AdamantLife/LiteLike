@@ -118,43 +118,15 @@ export function loadColony(){
 }
 
 /**
- * Loads items from events.json
- * Requires items.json to be loaded beforehand
- * @param {Object} items - The parsed values of items.json
+ * Loads events from events.json
  */
-export function loadEvents(items){
+export function loadEvents(){
     function parse(data){
         let combatants = [];
 
-        // Parse Combatants
-        for(let id=0; id < data.combatants.length; id++){
-            let comb = data.combatants[id];
-
-            // Compile weapons
-            let weapons = [];
-            // Get WeaponType for each weaponid and convert to Weapon Object
-            for(let weaponid of comb.weapons) weapons.push(new EQUIP.Weapon(items.weapons[weaponid]));
-
-            // Compile items
-            let combitems = [];
-            // Get ItemType for each itemid and convert to Item Object with the given quantity
-            for(let [itemid, qty] of comb.items) combitems.push(new EQUIP.Item(items.items[itemid], qty));
-
-            combatants.push(new CHARACTER.CombatCharacter(
-                // ID, Roles
-                // Combatants are all Enemys
-                comb.name, [CHARACTER.roles.CHARACTER, CHARACTER.roles.ENEMY],
-                // Statistics
-                // All combatants start at full hp
-                {hp: comb.hp, currentHP: comb.hp},
-                // Equipment
-                {
-                    weapons,
-                    armor: items.armor[comb.armor],
-                    items: combitems
-                }));
-        }
-
+        // We do not parse Combatants as they are not singletons
+        combatants = data.combatants;
+        
         return {combatants};
     }
     
@@ -163,6 +135,40 @@ export function loadEvents(items){
         .then(data=>parse(data))            // Pass the converted obejct to the parse function
     
     // Return the resulting promis so that the calling function can take action after it is done
+}
+
+/**
+ * Creates a new CombatCharacter for the given combatant
+ * @param {Number} id - The combatant id 
+ * @param {*} combatants - GAME.EVENTS.combatants
+ * @param {*} items - GAME.ITEMS
+ */
+export function createCombatant(id, combatants, items){
+    // Get raw combatant data
+    let comb = combatants[id];
+    // Compile weapons
+    let weapons = [];
+    // Get WeaponType for each weaponid and convert to Weapon Object
+    for(let weaponid of comb.weapons) weapons.push(new EQUIP.Weapon(items.weapons[weaponid]));
+
+    // Compile items
+    let combitems = [];
+    // Get ItemType for each itemid and convert to Item Object with the given quantity
+    for(let [itemid, qty] of comb.items) combitems.push(new EQUIP.Item(items.items[itemid], qty));
+
+    return new CHARACTER.CombatCharacter(
+        // ID, Roles
+        // Combatants are all Enemys
+        comb.name, [CHARACTER.roles.CHARACTER, CHARACTER.roles.ENEMY],
+        // Statistics
+        // All combatants start at full hp
+        {hp: comb.hp, currentHP: comb.hp},
+        // Equipment
+        {
+            weapons,
+            armor: items.armor[comb.armor],
+            items: combitems
+        });
 }
 
 /**

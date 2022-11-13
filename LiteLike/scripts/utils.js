@@ -195,6 +195,7 @@ export class EventListener{
         if(additional && typeof additional !== "undefined"){
             Object.assign(event,additional);
         }
+
         // Include eventtype for reference
         event.eventtype = eventtype;
         

@@ -39,16 +39,13 @@ export class Game{
         this.EVENTS;
         // Load the items
         IO.loadItems()
-            .then(result=>{
-                this.ITEMS = result;
-                // After items are loaded, load Events
-                IO.loadEvents(result)
-                    .then(result=>{
-                        this.EVENTS = result;
-                    })
-                    .catch(error=>console.log(error));
-            })
+            .then(result=>{this.ITEMS = result;})
             .catch(error=> console.log(error));
+
+        // Load event data
+        IO.loadEvents()
+            .then(result=>{this.EVENTS = result;})
+            .catch(error=>console.log(error));
 
         this.JOBS = null;
         this.SECTORS = null;
