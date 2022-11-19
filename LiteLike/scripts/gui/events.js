@@ -95,7 +95,7 @@ function addReward(reward){
 function addRewardToEvent(reward){
     let rewards = GAME.EVENT.reward;
     // If the item is a weapon, we just add it and move on
-    if(reward.type == "weapon"){
+    if(reward.type == "Weapon"){
         // Add to event rewards
         rewards.push(reward);
         // Add to GUI and return
@@ -281,6 +281,9 @@ function exchangeCache(event, row, reward, player){
 
         // Remove element from dropdown
         itemele.remove();
+
+        // Collect the maximum amount of the reward we can
+        collectReward(event, row, reward, player);
 
         // Add Dropped Item back into reward area
         addRewardToEvent(new EVENTS.Reward("Weapon", item));

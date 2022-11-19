@@ -95,9 +95,6 @@ export class WeaponType extends ShopItem{
  *  unfreeze warmup -> Weapon begins charging
  *  when warmup is ready -> weapon is fireable
  *  
- * 
- * TODO: Add Ammuniton-Type Weapons
- * TODO: For Projectile-Type Weapons, consider creating a Projectile Item and delegating to that
  */
 export class Weapon {
     /**
@@ -294,7 +291,7 @@ export class Item extends Stackable{
      * @returns {Item} - A copy of the Item
      */
     new(qty){
-        if(typeof qty == "undefined") qty = this.quantity
+        if(typeof qty == "undefined") qty = this.quantity;
         return new Item(this.itemtype, qty);
     }
 
@@ -363,7 +360,7 @@ export class Resource extends Stackable{
      * @returns {Resource} - A copy of the Resource
      */
     new(qty){
-        if(typeof qty == "undefined") qty = this.quantity
+        if(typeof qty == "undefined") qty = this.quantity;
         return new Resource(this.resourcetype, qty);
     }
 
