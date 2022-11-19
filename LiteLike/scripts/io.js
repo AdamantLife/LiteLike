@@ -154,7 +154,14 @@ export function createCombatant(id, combatants, items){
     // Compile items
     let combitems = [];
     // Get ItemType for each itemid and convert to Item Object with the given quantity
+    // Add the Item to the items bag (items are unsorted)
     for(let [itemid, qty] of comb.items) combitems.push(new EQUIP.Item(items.items[itemid], qty));
+
+    // Compile resources
+    let combresources = [];
+    // Get ResourceType for each resourceid and convert to Resource Object with the given quantity
+    // Store that Resource Object at its correct index
+    for(let [resid, qty] of comb.resources) combresources[resid]=new EQUIP.Resource(items.resources[resid], qty);
 
     return new CHARACTER.CombatCharacter(
         // ID, Roles
@@ -167,7 +174,8 @@ export function createCombatant(id, combatants, items){
         {
             weapons,
             armor: items.armor[comb.armor],
-            items: combitems
+            items: combitems,
+            resources: combresources
         });
 }
 

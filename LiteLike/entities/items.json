@@ -6,7 +6,8 @@
             "warmup": 500,
             "range": "MELEE",
             "shopPrerequisites":[],
-            "shopCost":[]
+            "shopCost":[],
+            "weight":1
         },
         { 
             "damage": 2,
@@ -14,7 +15,19 @@
             "warmup": 1000,
             "range": "RANGED",
             "shopPrerequisites":[],
-            "shopCost":[]
+            "shopCost":[],
+            "ammunition":4,
+            "weight":1
+        },
+        {
+            "damage":3,
+            "cooldown":2000,
+            "warmup": 2000,
+            "range": "LASER",
+            "shopPrerequisites":[],
+            "shopCost":[],
+            "ammunition":1,
+            "weight":1
         }
     ],
     "armor":[
@@ -37,7 +50,8 @@
             "isConsumable":true,
             "cooldown":1000,
             "shopPrerequisites":[],
-            "shopCost":[]
+            "shopCost":[],
+            "weight": 1
         }
     ],
     "resource":[
@@ -60,24 +74,29 @@
             "weight": 1,
             "shopPrerequisites":[],
             "shopCost":[[1,30]]
+        },
+        {
+            "weight": 1,
+            "shopPrerequisites":[],
+            "shopCost":[[2,10]]
         }
     ],
     "transport":[
         {
             "maxReactorPower":10,
-            "capacity":10,
+            "capacity":20,
             "shopPrerequisites":[],
             "shopCost":[]
         },
         {
             "maxReactorPower":15,
-            "capacity":15,
+            "capacity":30,
             "shopPrerequisites":[],
             "shopCost":[]
         },
         {
             "maxReactorPower":20,
-            "capacity":20,
+            "capacity":40,
             "shopPrerequisites":[],
             "shopCost":[]
         }

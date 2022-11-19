@@ -16,7 +16,11 @@
         },
         {
             "name": "Kinetic Rifle",
-            "flavor": "In an age of lasers and rockets, making something really hard go really fast can still cause a lot of Trauma"
+            "flavor": "In an age of lasers and rockets, making something really hard go really fast can still cause a lot of trauma"
+        },
+        {
+            "name": "Laser Pistol",
+            "flavor": "This handy little sidearm focuses the rage of a thousand suns into an itty bitty laser beam."
         }
     ],
     "armor":[
@@ -51,6 +55,10 @@
         {
             "name": "Biomaterial",
             "flavor": "Biological matter from living organisms that doesn't have any obvious use"
+        },
+        {
+            "name": "Kinetic Slugs",
+            "flavor": "Solid metal chunks of bad intentions"
         }
     ],
     "transport":[

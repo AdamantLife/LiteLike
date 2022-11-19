@@ -3,6 +3,10 @@
 import * as UTILS from "./utils.js";
 import {weaponranges} from "./items.js";
 
+// This is a post-combat time period (in ms) where the
+// player can still activate items before combat is over
+const LOCKOUT = 1500;
+
 /**
  * Description of a combat callback
  * DEVNOTE- Since we're emulating A Dark Room, we're only concerned with 1v1
@@ -37,7 +41,7 @@ export class CharacterAction{
  * A Combat Instance
  */
 export class Combat extends UTILS.EventListener{
-    static EVENTTYPES = UTILS.enumerate("startloop","endloop","startstack","endstack","useweapon", "useitem", "endcombat");
+    static EVENTTYPES = UTILS.enumerate("startloop","endloop","startstack","endstack","useweapon", "useitem", "endcombat", "characterko");
 
     /**
      * 
@@ -53,6 +57,9 @@ export class Combat extends UTILS.EventListener{
         this.playerQueue = [];
         this.playerDistance = weaponranges.RANGED;
         this.enemyDistance = weaponranges.RANGED;
+        // This is a post-combat time period where the
+        // player can still activate items before combat is over
+        this.lockout = false;
     }
 
     getDefaultEventData(){
@@ -91,8 +98,11 @@ export class Combat extends UTILS.EventListener{
         // Trigger startloop event
         this.triggerEvent(Combat.EVENTTYPES.startloop);
 
-        // If combat is over, resolve combat and return
-        if(this.victor !== null) return this.resolveCombat();
+        // Player has lost, so end combat
+        if(this.victor == this.enemy) return this.resolveCombat();
+
+        // Player has won and lockout time is over
+        if(this.victor == this.player & this.lockout <= UTILS.now()) return this.resolveCombat();
         
         let playerCommands = [], enemyActions = [];
 
@@ -101,7 +111,20 @@ export class Combat extends UTILS.EventListener{
         // Clear playerQueue
         this.playerQueue = [];
         
-        this.getEnemyAction(enemyActions);
+        // Enemy is dead, so it can't take new actions
+        if(!this.lockout){
+            this.getEnemyAction(enemyActions);
+        }else{
+            // But if it fired a projectile weapon, that projectile will still hit the player
+            // DEV NOTE: Besides being logical, this is also how A Dark Room functioned
+            for(let weapon of this.enemy.weapons){
+                // Weapon has to be ranged and its warmup has to be ready
+                if(weaponranges[weapon.weapontype.range] == weaponranges.RANGED && weapon.warmup.isReady){
+                    // Add the weapon action
+                    enemyActions.push(new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player));
+                }
+            }
+        }
 
         this.getCharged(playerCommands, enemyActions);
 
@@ -144,10 +167,10 @@ export class Combat extends UTILS.EventListener{
      */
     getCharged(playerCommands, enemyActions){
         for(let weapon of this.player.weapons){
-            if(weapon.isFireable()) playerCommands.push(new CharacterAction(this.player, actiontypes.WEAPON, weapon, this.enemy));
+            if(weapon.isFireable(this.player)) playerCommands.push(new CharacterAction(this.player, actiontypes.WEAPON, weapon, this.enemy));
         }
         for(let weapon of this.enemy.weapons){
-            if(weapon.isFireable()) enemyActions.push(new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player));
+            if(weapon.isFireable(this.enemy)) enemyActions.push(new CharacterAction(this.enemy, actiontypes.WEAPON, weapon, this.player));
         }
     }
 
@@ -183,7 +206,7 @@ export class Combat extends UTILS.EventListener{
      */
     handleWeapon(action){
         let weapon = action.object;
-        if(!weapon.isFireable()){
+        if(!weapon.isFireable(action.activator)){
             // If the weapon is a warmup-type, then we will start charging it
             // if it is ready to be charged
             if(weapon.warmup && weapon.warmup.isFrozen){
@@ -215,7 +238,7 @@ export class Combat extends UTILS.EventListener{
         // Have weapon set itself as fired
         // We're allowing weapon to handle this itself incase using a weapon becomes
         // more complicated in the future
-        weapon.fire();
+        weapon.fire(action.activator);
     }
 
     /**
@@ -248,9 +271,23 @@ export class Combat extends UTILS.EventListener{
      * @returns {Boolean} - A boolean indicating wether player or enemy has been KO'd
      */
     handleKO(){
-        if(this.player.isKOd()) this.victor = this.enemy;
-        else if(this.enemy.isKOd()) this.victor = this.player;
-        if(this.victor !== null) return true;
+        let ko = null;
+        if(this.player.isKOd()){
+            this.victor = this.enemy;
+            ko = this.player;
+        }
+        else if(this.enemy.isKOd()){
+            this.victor = this.player;
+            ko = this.enemy;
+            // Start lockout time where the player can still act
+            // even though combat is over
+            this.lockout = UTILS.now() + LOCKOUT;
+        }
+        if(this.victor !== null){
+            // Notify listeners that a character has been ko'd
+            this.triggerEvent(Combat.EVENTTYPES.characterko, {character: ko});
+            return true;
+        }
         return false;
     }
 

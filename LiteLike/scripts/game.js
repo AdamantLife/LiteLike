@@ -62,6 +62,9 @@ export class Game{
         // Current Map
         this.MAP = null;
 
+        // Current EVENT
+        this.EVENT = null;
+
         // Current Combat being executed (if any)
         this.COMBAT = null;
     }

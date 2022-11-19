@@ -27,12 +27,9 @@ const KEYDIRECTIONS = Object.freeze({
     ArrowLeft: directions.WEST
 });
 
-// Keyboard Binding for Map Inventory activation
-const INVENTORY = {"i": true, "I": true};
-
 const SELECT = {"Enter": true};
 
 // Keyboard Binding for Cancel/Back
 const CANCEL = {"Escape": true};
 
-export {KEYDIRECTIONS, INVENTORY, CANCEL};
+export {KEYDIRECTIONS, CANCEL};

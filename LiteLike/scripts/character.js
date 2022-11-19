@@ -60,6 +60,126 @@ export class Character extends Entity{
     }
 
     /**
+     * Given a weapon id, return the index of the first weapon with that id.
+     * Return -1 if a matching weapon is not found
+     * @param {Number} weapon - The weapon id to get
+     * @returns {Number | -1} - The index of the matching weapon, or -1 if player doesn't have that weapontype
+     */
+    getWeaponIndex(weapon){
+        // Iterate over all weapons
+        let weap;
+        for(let i = 0; i < this.weapons.length; i++){
+            weap = this.weapons[i]
+            // A weapon exists at this index
+            if(weap && typeof weap !== "undefined"
+                // and its weapontype id matches what we are looking for
+                && weap.weapontype.id  == weapon) return i;
+        }
+
+        // We didn't match, so return -1
+        return -1;
+    }
+
+    /**
+     * Returns the first weapon with the given weapon id, or null if none are found
+     * @param {Number} weapon - The weapon id to get
+     * @returns {Weapon | null} - Returns the weapon if they player has it, otherwise none
+     */
+    getWeapon(weapon){
+        // Iterate over weapons
+        for(let weap of this.weapons){
+            // If weapon id matches, return it
+            if (weap.weapontype.id == weapon){
+                return weap;
+            }
+        }
+        // Null will be returned implicitly
+    }
+
+    /**
+     * Returns the index of the item with the given item id in the player's equipment
+     * @param {Number} item - The Item id
+     * @returns {Number} - Returns the equipment index of the item, or -1 if the player does not possess the item
+     */
+    getItemIndex(item){
+        // Iterate over items to find the item
+        for(let i = 0; i < this.items.length; i++){
+            // Check if itemid is the one we're looking for
+            // Return the current index if it is
+            if(this.items[i].itemtype.id == item) return i;
+        }
+
+        // Item not found, so return -1
+        return -1;
+    }
+
+    /**
+     * Checks the character's items list for the given item and returns it if the character has it
+     * @param {Number} item - The item id to get
+     * @param {Boolean} returnEmpty- A boolean to indicating whether to return an empty item
+     * @returns {Item | null} - Returns the item if the player has it in non-zero quantity, otherwise null
+     */
+    getItem(item, returnEmpty = false){
+        // Items are unsorted, so we'll have to dig through the whole backpack
+        for(let it of this.items){
+            // If itemtype matches, return the Item Instance
+            if(it.itemtype.id == item){
+                // If returnEmpty is false and we don't have any
+                // return null instead of the  item
+                if(it.quantity <= 0 && !returnEmpty) return null;
+                // Return the item
+                return it;
+            }
+        }
+        // At this point, we did not find it, so null will be returned implicitly
+    }
+
+    /**
+     * Returns the given resource if the Player has a positive quantity of it
+     * @param {Number} resource - The resource ID to return
+     * @param {Boolean} returnEmpty- A boolean to indicating whether to return an empty resource
+     * @returns {Resource | null} - 
+     */
+    getResource(resource, returnEmpty = false){
+        // Resources are sorted, so we can just get the corresponding index
+        let r = this.resources[resource];
+        // If the resources is not in our resources array, return null
+        // Also return null if we don't have any quantity of the resource and we're not supposed to returnEmpty
+        if(!r || typeof r == "undefined" || (r.quantity <= 0 && returnEmpty)) return null;
+
+        // Otherwise, return it
+        return r;
+    }
+
+    /**
+     * Adds an item to the Character's equipment. If the character already
+     * has the item, increases its quantity instead
+     * @param {Item} item - The item to be added
+     */
+    addItem(item){
+        // Check if we already have it
+        let existing = this.getItem(item.itemtype.id, true);
+        // Just add it if we don't have it
+        if(!existing) return this.items.push(item);
+        // Otherwise, we need to update our item
+        existing.quantity += item.quantity;
+    }
+
+    /**
+     * Adds a resource to the Character's equipment. If the character already
+     * has the resource, increases its quantity instead
+     * @param {Resource} resource - The resource to be added
+     */
+     addResource(resource){
+        // Check if we already have it
+        let existing = this.getResource(resource.resourcetype.id, true);
+        // Just add it if we don't have it
+        if(!existing) return this.resources[resource.resourcetype.id] = resource;
+        // Otherwise, we need to update our item
+        existing.quantity += resource.quantity;
+    }
+
+    /**
      * Applies and caps an HP change between 0 and max hp and notifies listeners
      * @param {Number} value - HP Change
      */
@@ -142,10 +262,14 @@ export class PlayerCharacter extends Character{
     get weight(){
         let weight = 0;
         for(let weapon of this.equipment.weapons) weight+= weapon.weapontype.weight;
-        for(let item of this.equipment.items) weight += item.itemtype.weight;
-        for(let resource of this.equipment.resources) weight += resource.weight;
+        for(let item of this.equipment.items) weight += item.totalWeight;
+        for(let resource of Object.values(this.equipment.resources)) weight += resource.totalWeight;
         return weight;
     }
+
+    get weapons(){return this.equipment.weapons;}
+    get items(){ return this.equipment.items;}
+    get resources(){ return this.equipment.resources;}
 }
 
 /**
@@ -164,6 +288,7 @@ export class CombatCharacter extends Character{
      * @param {Weapon[]} equipment.weapons - An Array of Weapon Objects available for the character
      * @param {Armor}    equipment.armor - An Armor object
      * @param {Item[]}   equipment.items - An Array of Item Objects owned by the character
+     * @param {Resource[]} equipment.resources - An Array of Resource Objects owned by the character
      */
     constructor(id, roles, statistics, equipment){
         super(id, roles);
@@ -184,6 +309,11 @@ export class CombatCharacter extends Character{
         // If there are items in equipment, use that value
         if(equipment.hasOwnProperty("items")) items = equipment.items;
         this.items = items;
+
+        let resources = [];
+        // If there are items in equipment, use that value
+        if(equipment.hasOwnProperty("resources")) resources = equipment.resources;
+        this.resources = resources;
     }
 
     /**
@@ -237,7 +367,7 @@ export class CombatCharacter extends Character{
      */
     firstAvailableWeapon(){
         for(let weapon of this.weapons){
-            if(weapon.isAvailable()) return weapon;
+            if(weapon.isAvailable(this)) return weapon;
         }
     }
 
@@ -247,7 +377,7 @@ export class CombatCharacter extends Character{
      */
     firstFireableWeapon(){
         for(let weapon of this.weapons){
-            if(weapon.isFireable()) return weapon;
+            if(weapon.isFireable(this)) return weapon;
         }
     }
 }

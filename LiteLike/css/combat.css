@@ -11,32 +11,102 @@ table[data-loadout] tr{
     flex-wrap:wrap;
     border-style:outset;
     background-color: white;
+    z-index: 1;
+
+    /* Centering and margins */
+    left:10px;
+    right:10px;
+    top:10vh;
+    height: 80vh;
+    margin-right:auto;
+    margin-left:auto;
+}
+
+#combat.shown{
+    animation-name: opencombat;
+}
+
+#combat.hidden{
+    animation-name: closecombat;
+}
+
+@keyframes opencombat {
+    from {
+        display:none !important;
+        width:0px;
+        height:0px;
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+    to {
+        display:initial;
+        width: calc(100% - 20px);
+        height:80vh;
+        flex-wrap: initial;
+        overflow: hidden;
+    }
+}
+
+@keyframes closecombat {
+    from {
+        display:initial;
+        width: calc(100%-20px);
+        height:80vh;
+        flex-wrap: initial;
+        overflow: hidden;
+    }
+    to {
+        display:none !important;
+        width:0;
+        height:0;
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
 }
 
 #combat>.character{
     width:50%;
     min-width: 25em;
+}
+
+#combat>.character>div:first-child(){
     overflow: hidden;
     position: relative;
 }
 
-#combat>.character>h1{
+#combat>.character h1.charactername{
     position: absolute;
     white-space: nowrap;
     top:0;
 }
 
-#combat>.character[data-combatant="enemy"]>h1{
-    text-align: right;
+#combat>.character.dead h1.charactername{
+    animation: 1500ms easin 0s death;
+    color:rgb(200, 165, 165);
 }
 
-#combat>.character.swing>h1{
+@keyframes death {
+    from{
+        color:black;
+    }
+    to{
+        color:rgb(200, 165, 165);
+    }
+}
+
+#combat>.character[data-combatant="enemy"] h1.charactername{
+    text-align: right;
+    right:0;
+}
+
+#combat>.character.swing h1.charactername{
     animation-timing-function: ease-in;
     animation-delay: 0s;
     animation-direction: alternate;
+    animation-iteration-count: 2;
 }
 
-#combat>.character.swing[data-combatant="player"]>h1{
+#combat>.character.swing[data-combatant="player"] h1.charactername{
     animation-name: playerswing;
 }
 
@@ -45,11 +115,11 @@ table[data-loadout] tr{
             right: 90%;
         }
         to{
-            right: 0%;
+            right: 50%;
         }
     }
 
-#combat>.character.swing[data-combatant="enemy"]>h1{
+#combat>.character.swing[data-combatant="enemy"] h1.charactername{
     animation-name: enemyswing;
 }
 
@@ -58,6 +128,70 @@ table[data-loadout] tr{
             left: 90%;
         }
         to{
-            left: 0%;
+            left: 50%;
+        }
+    }
+#combat>.character>.projectile{
+    position: absolute;
+    top:0px;
+    animation-timing-function: linear;
+    animation-delay: 0s;
+}
+
+#combat>.character[data-combatant="player"]>.projectile{
+    animation-name: playerprojectile;
+}
+
+
+    @keyframes playerprojectile {
+        from{
+            left:0vw;
+        }
+        to{
+            left:100vw;
+        }
+    }
+
+#combat>.character[data-combatant="enemy"]>.projectile{
+    animation-name: enemyprojectile;
+}
+
+
+    @keyframes enemyprojectile {
+        from{
+            left:100vw;
+        }
+        to{
+            left:0vw;
+        }
+    }
+
+#combat>.character>.laser{
+    position: absolute;
+    width:80vw;
+    top:.5em;
+    left: 10vw;
+    /*border-radius: 50px;*/
+    height: 1em;
+
+    animation-name: laser;
+    animation-timing-function: ease-out;
+    animation-delay: 0s;
+}
+
+#combat>.character[data-combatant="player"]>.laser{
+    background-color: blue;
+}
+
+#combat.character[data-combatant="enemy"]>.laser{
+    background-color: red;
+}
+
+    @keyframes laser {
+        from{
+            clip-path: ellipse(50% 80%);
+        }
+        to{
+            clip-path: ellipse(50% 0%);
         }
     }

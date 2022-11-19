@@ -17,7 +17,7 @@ export const reward = UTILS.enumerate("item", "unlock" , "map" );
  * @property {Number} qty - Quantity of the item
  */
 
-class Reward{
+export class Reward{
     /**
      * Initializes a new Reward Object
      * @param {String} type - The reward type
@@ -33,9 +33,7 @@ export class Encounter{
     /**
      * Creates a new encounter
      * @param {Symbol} type - an encountertype enumeration
-     * @param {Object[]} reward -  An array of rewards
-     * @param {Symbol}  reward[].type - a reward enumeration
-     * @param {*}       reward[].value - the value of the reward
+     * @param {Reward[]} reward -  An array of rewards
      * @param {*} options - Specifications of the encounter; depends on encountertype
      */
     constructor(type, reward, options){
@@ -124,7 +122,7 @@ export function buildCombatEncounter(game, enemy, rewards, options){
     for(let reward of rewards){
         let result = parseReward(game, reward);
         if(result) rewardobjs.push(result);
-    }    
+    }
 
     return new CombatEncounter(rewardobjs, {enemy, game})
 }
@@ -156,13 +154,13 @@ export function parseReward(game, reward){
         // TODO: add Map Reward
 
         // Others
-        case "Item":
+        case "item":
             lookup = game.ITEMS.items;
             break;
-        case "Weapon":
+        case "weapon":
             lookup = game.ITEMS.weapons;
             break;
-        case "Resource":
+        case "resource":
             lookup = game.ITEMS.resources;
             break;
         }
@@ -183,14 +181,14 @@ export function parseReward(game, reward){
 
     // Other things require a little bit more effort
     switch(reward.type){
-        case "Item":
-            obj = ITEMS.Item(obj, qty);
+        case "item":
+            obj = new ITEMS.Item(obj, qty);
             break;
-        case "Weapon":
-            obj = ITEMS.Weapon(obj);
+        case "weapon":
+            obj = new ITEMS.Weapon(obj);
             break;
-        case "Resource":
-            obj = ITEMS.Resource(obj, qty);
+        case "resource":
+            obj = new ITEMS.Resource(obj, qty);
             break;
     }
     

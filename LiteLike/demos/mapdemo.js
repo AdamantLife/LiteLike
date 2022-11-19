@@ -1,13 +1,13 @@
 "use strict";
 
 import {toggleAllButtons, clearDemoBox} from "./utils.js";
-import * as CHARA from "../scripts/character.js";
-import * as IO from "../scripts/io.js";
+import * as EQUIP from "../scripts/items.js";
 import * as EVENTS from "../scripts/events.js";
-import * as UTILS from "../scripts/utils.js";
+
 import * as MAP from "../scripts/map.js";
 import * as KEYBINDINGS from "../scripts/keybindings.js";
 import * as COMBATGUI from "../scripts/gui/combat.js";
+import * as EVENTSGUI from "../scripts/gui/events.js";
 
 var DEMOMAP = ".....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n..........!..........\n.....................\n..........C..........\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................";
 
@@ -20,6 +20,11 @@ export function mapDemo(){
     GAME.PLAYER = GAME.startingCharacter();
     // Give Player more Repair Bots to work with
     GAME.PLAYER.equipment.items[0].quantity = 10;
+    // Give Player Laser Pistol
+    GAME.PLAYER.equipment.weapons.push(new EQUIP.Weapon(GAME.ITEMS.weapons[2]))
+    // Give Player Batteries for Laser Pistol
+    GAME.PLAYER.equipment.resources[1] = new EQUIP.Resource(GAME.ITEMS.resources[1], 5);
+
 
     // Initialize a new Map and set the Map maunally
     GAME.MAP = GAME.newMap()
@@ -27,12 +32,13 @@ export function mapDemo(){
 
 
     // Setup the map area div and get a reference
-    document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<div id="mapDemo" style="position:relative;"><div id="inventoryBox" style="position:absolute; display:none;"></div>
+    document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<div id="mapDemo" style="position:relative;">
+    <div id="events" class="popup hidden"></div>
     <div id="combat" class="popup hidden"></div>
     <div id="foodRepairBox"><div data-type="hp"><span style="font-weight:bold;">HP: </span><span data-value></span>/${GAME.PLAYER.statistics.hp}</div><div data-type="fuel"><span style="font-weight:bold;">Reactor Power: </span><span data-value></span></div><div data-type="repair"><span style="font-weight:bold;">Repair Bots: </span><span data-value></span></div></div><div id="mapBox" style="font-family:monospace;display:inline;letter-spacing:1em;"></div></div>`);
 
     // Popup box which shows all items collected
-    let inventoryBox = document.getElementById("inventoryBox");
+    let eventBox = document.getElementById("events");
     // Combat box which will show up on Combat Events
     let combatBox = document.getElementById("combat");
     // Display travel resources (food and repairbots)
@@ -81,10 +87,6 @@ export function mapDemo(){
     // Populate the map
     reloadMap();
 
-    function updateInventory(){
-        
-    }
-
     // Add the Quit button
     document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<button id="quitMap", style="position:sticky;bottom:5px;">Quit Demo</button>`);
     // Attach the finishDemo callback
@@ -100,8 +102,8 @@ export function mapDemo(){
         let key = event.key;
         // Combat is displayed, so only handle input for combat
         if(combatBox.classList.contains("shown")) return COMBATGUI.handleCombatKeyPress(event);
-        // Inventory is displayed, so only handle input for Inventory
-        if(inventoryBox.classList.contains("shown")) return handleInventoryKeyPress(key);
+        // Event is displayed, so only handle input for Events
+        if(eventBox.classList.contains("shown")) return handleEventKeyPress(key);
 
         // Otherwise, we're on the map view, so handle map-only inputs
         // If the key is in KB.KEYDIRECTIONS 
@@ -113,23 +115,9 @@ export function mapDemo(){
             if(direction) GAME.MAP.playerQueue.push(new MAP.MapAction(MAP.mapactions.MOVE, direction));
             return;
         }
-
-        // If the key is in KB.INVENTORY
-        if(typeof KEYBINDINGS.INVENTORY[key] !== "undefined"){
-            // Toggle the inventory box
-            if(inventoryBox.style.display === "none"){
-                // Show box if it's not displayed
-                inventoryBox.style.display = "block";
-                updateInventory();
-            }
-            else{
-                // Hide box if it is displayed
-                inventoryBox.style.display = "none";
-            }
-        }
     }
 
-    function handleInventoryKeyPress(key){
+    function handleEventKeyPress(key){
     }
 
     /**
@@ -148,23 +136,33 @@ export function mapDemo(){
     /**
      * Concludes combat and restores the UI to the Map view
      */
-        function finishCombat(){
+    function finishCombat(){
         // Player lost
         if(GAME.COMBAT.victor != GAME.COMBAT.player){
             // Just call gameOver
             return gameOver("Game Over! You were slain in combat!")
         }
 
-        // Clear all listeners
-        GAME.COMBAT.removeAllListeners();
-        GAME.COMBAT.player.removeAllListeners();
-        GAME.COMBAT.enemy.removeAllListeners();
-        // Clear combat from Game
-        GAME.COMBAT = null;
+        // Show rewards
+        EVENTSGUI.loadRewardEvent(GAME.EVENT.reward, cleanupCombat)   ;
+    }
 
-        // Hide combatBox
-        combatBox.classList.remove("shown");
-        combatBox.classList.add("hidden");
+        function cleanupCombat(){
+
+            updateTravelResources();
+
+            // Clear all listeners
+            GAME.COMBAT.removeAllListeners();
+            GAME.COMBAT.player.removeAllListeners();
+            GAME.COMBAT.enemy.removeAllListeners();
+            // Clear combat from Game
+            GAME.COMBAT = null;
+
+            // Hide combatBox and eventBox(rewards)
+            combatBox.classList.remove("shown");
+            combatBox.classList.add("hidden");
+            eventBox.classList.remove("shown");
+            eventBox.classList.add("hidden");
     }
 
     /**
@@ -173,6 +171,8 @@ export function mapDemo(){
     function portEvent(){
         // Get Combat event
         let event = EVENTS.buildCombatEncounter(GAME, 0, [{type: "resource", id: 2, qty: 10}]);
+        // Give game a reference to the event
+        GAME.EVENT = event;
         // Initialize it
         let combat = event.initEncounter();
         // Use laodCombat to display it on the screen

@@ -1,9 +1,10 @@
 "use strict";
 
+import { Character } from "./character.js";
 import * as UTILS from "./utils.js";
 
 // Weapon Ranges
-export const weaponranges = UTILS.enumerate("MELEE", "RANGED");
+export const weaponranges = UTILS.enumerate("MELEE", "RANGED", "LASER");
 
 /**
  * A superclass for stackable items (items with quantities) and have weight
@@ -53,8 +54,9 @@ export class WeaponType extends ShopItem{
      *                      after it has been activated
      * @param {Symbol} range - The range of the weapon from weaponranges
      * @param {Number} weight - how much a single qty weighs (contributes to the Transport's Capacity)
+     * @param {Item} ammunition - If this is a projectile-type weapon, the item id for its ammunition
      */
-    constructor(id, damage, cooldown, warmup, range, weight){
+    constructor(id, damage, cooldown, warmup, range, weight, ammunition){
         super();
         this.id = id;
         this.damage = damage;
@@ -62,7 +64,14 @@ export class WeaponType extends ShopItem{
         this.warmup = warmup;
         this.range = range;
         this.weight = weight;
+        this.ammunition = ammunition
     }
+
+    
+    get requiresAmmunition(){
+        return this.ammunition && typeof this.ammunition !== "undefined";
+    }
+    
 }
 
 /**
@@ -103,20 +112,41 @@ export class Weapon {
     }
 
     /**
-     * Returns whether the weapon is available to used
+     * Returns a new copy of the object
      */
-    isAvailable(){
+    new(){
+        return new Weapon(this.weapontype);
+    }
+
+    /**
+     * Returns the weapontype; useful when we're treating the weapon
+     * as a generic "item"
+     */
+    get type(){ return this.weapontype; }
+
+    /**
+     * Returns whether the weapon is available to used
+     * 
+     * @param {Character} character - The character using the weapon; necessary if the weapon has ammunition 
+     */
+    isAvailable(character){
         // The weapon is not on cooldown or charging
-        return this.cooldown.isReady && this.warmup.isFrozen && !this.warmup.isReady;
+        return this.cooldown.isReady && this.warmup.isFrozen && !this.warmup.isReady &&
+        // If weapon has ammunition, check that character has the required ammunition
+        !this.missingAmmunition(character);
     }
 
     /**
      * Returns whether the weapon is ready to fire
+     * 
+     * @param {Character} character - The character firing the weapon; necessary if the weapon has ammunition 
      */
-     isFireable(){
+     isFireable(character){
         // Not on cooldown and not a warmup weapon or
         // Chargeable weapon only has a ready warmup when it's ready to fire
-        return this.cooldown.isReady && this.warmup.isReady
+        return this.cooldown.isReady && this.warmup.isReady &&
+        // If weapon has ammunition, check that character has the required ammunition
+        !this.missingAmmunition(character);
     }
 
     /**
@@ -130,11 +160,21 @@ export class Weapon {
     }
 
     /**
-     * Updates the weapon's cooldown and warmup after it is fired
+     * Checks whether the weapon needs ammunition which the character does not have
+     * @param {Character} character - The character using the weapon
      */
-    fire(){
+    missingAmmunition(character){
+        return this.weapontype.requiresAmmunition && !character.getResource(this.weapontype.ammunition);
+    }
+
+    /**
+     * Updates the weapon's cooldown and warmup after it is fired
+     * 
+     * @param {Character} character - The character firing the weapon; necessary if the weapon has ammunition 
+     */
+    fire(character){
         // Can't fire weapon that is not fireable
-        if(!this.isFireable()) return;
+        if(!this.isFireable(character)) return;
 
         // Start the cooldown timer on a new cycle
         this.cooldown.clearReady();
@@ -142,6 +182,15 @@ export class Weapon {
 
         // Clear the warmup ready flag (don't unfreeze)
         this.warmup.clearReady();
+
+        // Subtract ammunition if we need it
+        if(this.weapontype.requiresAmmunition){
+            let resource = character.getResource(this.weapontype.ammunition);
+            // This is an error if it happens, but we aren't handling errors right now
+            // DEVNOTE- That makes this a potential exploit
+            if(!resource) return;
+            resource.quantity -= 1;
+        }
     }
 
     /**
@@ -237,6 +286,27 @@ export class Item extends Stackable{
         this.cooldown = new UTILS.Timer(UTILS.now(), this.itemtype.cooldown, true);
     }
 
+    /**
+     * Returns a new copy of the Item. If qty is provided, the copy will have
+     * the corresponding quantity instead.
+     * @param {Number} qty - If provided, the quantity the copy should have. Otherwise,
+     *      the copy will have the same quantity as the original
+     * @returns {Item} - A copy of the Item
+     */
+    new(qty){
+        if(typeof qty == "undefined") qty = this.quantity
+        return new Item(this.itemtype, qty);
+    }
+
+    /**
+     * Returns the itemtype; useful when we're treating the item
+     * as a generic "item"
+     */
+     get type(){ return this.itemtype; }
+
+    /**
+     * Reduces the Item's quantity by one (min 0) and begins the cooldown timer
+     */
     use(){
         // If this item is consumable, remove a quantity (min. 0 after removing)
         if(this.itemtype.isConsumable) this.quantity = Math.max(this.quantity - 1, 0);
@@ -284,6 +354,24 @@ export class Resource extends Stackable{
         super(quantity, resourcetype.weight);
         this.resourcetype = resourcetype;
     }
+    
+    /**
+     * Returns a new copy of the Resource. If qty is provided, the copy will have
+     * the corresponding quantity instead.
+     * @param {Number} qty - If provided, the quantity the copy should have. Otherwise,
+     *      the copy will have the same quantity as the original
+     * @returns {Resource} - A copy of the Resource
+     */
+    new(qty){
+        if(typeof qty == "undefined") qty = this.quantity
+        return new Resource(this.resourcetype, qty);
+    }
+
+    /**
+     * Returns the resourcetype; useful when we're treating the resource
+     * as a generic "item"
+     */
+     get type(){ return this.resourcetype; }
 }
 
 /**
