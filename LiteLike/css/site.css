@@ -12,6 +12,7 @@ table.boldfirst tr>td:first-of-type{
 
 .popup.shown {
     display:initial;
+    white-space: initial;
 }
 
 .popup.hidden{
@@ -90,6 +91,7 @@ table.boldfirst tr>td:first-of-type{
         width:0px;
         height:0px;
         flex-wrap: nowrap;
+        white-space: nowrap;
         overflow: hidden;
     }
     to {
@@ -97,6 +99,7 @@ table.boldfirst tr>td:first-of-type{
         width: 50vw;
         height:50vh;
         flex-wrap: initial;
+        white-space: nowrap;
         overflow: hidden;
     }
 }
@@ -107,6 +110,7 @@ table.boldfirst tr>td:first-of-type{
         width: 50vw;
         height:50vh;
         flex-wrap: initial;
+        white-space: nowrap;
         overflow: hidden;
     }
     to {
@@ -114,6 +118,7 @@ table.boldfirst tr>td:first-of-type{
         width:0;
         height:0;
         flex-wrap: nowrap;
+        white-space: nowrap;
         overflow: hidden;
     }
 }

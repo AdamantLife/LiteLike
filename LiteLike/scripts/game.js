@@ -3,8 +3,8 @@
 import {PlayerCharacter, roles} from "./character.js";
 import { TheColony } from "./colony.js";
 import {Map} from "./map.js";
+import { EncounterSequence } from "./encounters.js";
 
-import * as EVENTS from "./events.js";
 import * as IO from "./io.js";
 import * as EQUIP from "./items.js";
 
@@ -35,16 +35,16 @@ export class Game{
 
         // Database of all items
         this.ITEMS = null;
-        // Database of all events (requires self.ITEMS to intialize)
-        this.EVENTS;
         // Load the items
         IO.loadItems()
             .then(result=>{this.ITEMS = result;})
             .catch(error=> console.log(error));
 
+        // Database of all encounters
+        this.ENCOUNTERS;
         // Load event data
-        IO.loadEvents()
-            .then(result=>{this.EVENTS = result;})
+        IO.loadEncounters()
+            .then(result=>{this.ENCOUNTERS = result;})
             .catch(error=>console.log(error));
 
         this.JOBS = null;
@@ -62,8 +62,8 @@ export class Game{
         // Current Map
         this.MAP = null;
 
-        // Current EVENT
-        this.EVENT = null;
+        // Current ENCOUNTER
+        this.ENCOUNTER = null;
 
         // Current Combat being executed (if any)
         this.COMBAT = null;
@@ -93,6 +93,22 @@ export class Game{
     newMap(seed, mask){
         if(!seed || typeof seed === "undefined") seed = this.random();
         return new Map(seed, mask, this.PLAYER);
+    }
+
+    /**
+     * Checks if the Game is currently in an EncounterSequence.
+     * If it is, adds the Encounter to the end of the Sequence.
+     * Otherwise, creates a new EncounterSequence with the given Encounter
+     * @param {Encounter} encounter - The encounter to add
+     * @returns - The Game's current EncounterSequence
+     */
+    getOrAddEncounter(encounter){
+        if(!this.ENCOUNTER){
+            this.ENCOUNTER = new EncounterSequence([encounter,]);
+        }else{
+            this.ENCOUNTER.addEncounter(encounter)
+        }
+        return this.ENCOUNTER
     }
 }
 

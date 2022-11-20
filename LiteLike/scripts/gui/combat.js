@@ -138,14 +138,18 @@ ${itemtable}
                 if(typeof object.weapontype !== "undefined" && object.weapontype.requiresAmmunition){
                     // Get resource object from player
                     let ammo = character.getResource(object.weapontype.ammunition);
-                    // Get Ammo name to display
-                    let ammunition = IO.getStrings(GAME.STRINGS, ammo);
-                    // Convert to quantity
-                    ammo = ammo ? ammo.quantity : 0;
-                    // Update hover text
-                    button.title = `${ammunition.name}: ${ammo}`;
-                    // If player doesn't have ammo, disable button so weapon cannot be used
-                    if(!ammo) button.disabled = true;
+                    // Character may not have ammo for this weapon
+                    if(ammo){
+                        // Get Ammo name to display
+                        let ammunition = IO.getStrings(GAME.STRINGS, ammo);
+                        // Convert to quantity
+                        ammo = ammo ? ammo.quantity : 0;
+                        // Update hover text
+                        button.title = `${ammunition.name}: ${ammo}`;
+                    }else{
+                        // If player doesn't have ammo, disable button so weapon cannot be used
+                        if(!ammo) button.disabled = true;
+                    }    
                 }
                 // If this is an item, add its qunatity on hover
                 else if(typeof object.itemtype !== "undefined"){

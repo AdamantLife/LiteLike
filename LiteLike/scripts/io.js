@@ -1,7 +1,6 @@
 "use strict";
 import * as EQUIP from "./items.js";
 import * as COLONY from "./colony.js";
-import * as EVENTS from "./events.js";
 import * as CHARACTER from "./character.js"
 import {instanceFromJSON} from "./utils.js";
 import {itemCallbacks} from "./callbacks.js";
@@ -118,9 +117,9 @@ export function loadColony(){
 }
 
 /**
- * Loads events from events.json
+ * Loads events from encoutners.json
  */
-export function loadEvents(){
+export function loadEncounters(){
     function parse(data){
         let combatants = [];
 
@@ -130,7 +129,7 @@ export function loadEvents(){
         return {combatants};
     }
     
-    return fetch("./entities/events.json")  // Fetch events.json from the server
+    return fetch("./entities/encounters.json")  // Fetch encounters.json from the server
         .then(r=>r.json())                  // Conver the file to an Object (json)
         .then(data=>parse(data))            // Pass the converted obejct to the parse function
     
@@ -140,7 +139,7 @@ export function loadEvents(){
 /**
  * Creates a new CombatCharacter for the given combatant
  * @param {Number} id - The combatant id 
- * @param {*} combatants - GAME.EVENTS.combatants
+ * @param {*} combatants - GAME.ENCOUNTERS.combatants
  * @param {*} items - GAME.ITEMS
  */
 export function createCombatant(id, combatants, items){

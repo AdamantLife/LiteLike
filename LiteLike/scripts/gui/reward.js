@@ -1,39 +1,23 @@
 "use-strict";
 
 import * as IO from "../io.js";
-import * as EVENTS from "../events.js";
+import * as ENCOUNTERS from "../encounters.js";
+import * as ENCOUNTERSGUI from "./encounters.js";
 
-
-/**
- * Convenience function to clear the Event Popup (before populating)
- * and return a reference to it for use
- * 
- * @returns {Element} - a reference to the Event Popup
- */
-function clearEvents(){
-    // Get Box
-    let eventBox = document.getElementById("events");
-    // Clear box of all child elements
-    while(eventBox.lastElementChild) eventBox.lastElementChild.remove();
-    // Return so calling function doesn't have to look for it
-    return eventBox;
-
-}
 
 /**
  * Populates the reward box with the given rewards and adds the control logic
  * 
- * @param {EVENTS.Reward[]} rewards - The list of reward objects to add
  * @param {Function} callback - The exit callback to call on close
  */
-export function loadRewardEvent(rewards, callback){
-    rewards = GAME.EVENT.reward;
-    let eventBox = clearEvents();
+export function loadRewardEvent(callback){
+    let rewards = GAME.ENCOUNTER.get().reward;
+    let eventBox = ENCOUNTERSGUI.clearEvents();
     
     // Add main, reward table, and close button
     eventBox.insertAdjacentHTML('beforeend', `<div class="eventsmain"><table><tbody id="rewardarea"></tbody</table></div><button id="eventexit">Close</button>`);
     // Attach exit callback
-    document.getElementById("eventexit").onclick = callback;
+    document.getElementById("eventexit").onclick = ()=>callback(GAME.ENCOUNTER.get());
     
     // Add rewards
     for(let reward of rewards){
@@ -45,13 +29,12 @@ export function loadRewardEvent(rewards, callback){
     }
 
     // Show Reward event
-    eventBox.classList.remove("hidden");
-    eventBox.classList.add("shown");
+    ENCOUNTERSGUI.showEvents(eventBox);
 }
 
 /**
  * Adds a reward to the GUI
- * @param {EVENTS.Reward} reward - The reward to add 
+ * @param {ENCOUNTERS.Reward} reward - The reward to add 
  */
 function addReward(reward){
     // Get reference to reward display area for later
@@ -90,10 +73,10 @@ function addReward(reward){
 
 /**
  * Adds a new reward to the event and the gui; this is due to dropping equipment to collect other rewards
- * @param {EVENTS.Reward} reward - The new reward to add
+ * @param {ENCOUNTERS.Reward} reward - The new reward to add
  */
 function addRewardToEvent(reward){
-    let rewards = GAME.EVENT.reward;
+    let rewards = GAME.ENCOUNTER.get().reward;
     // If the item is a weapon, we just add it and move on
     if(reward.type == "Weapon"){
         // Add to event rewards
@@ -128,7 +111,7 @@ function addRewardToEvent(reward){
  * Collects the maximum quantity of the given reward and adjusts the gui as necessary
  * @param {Event} event - Event is not used
  * @param {Element} row - The Row Element in the rewards table for the reward
- * @param {EVENTS.Reward} reward - The Reward being collected
+ * @param {ENCOUNTERS.Reward} reward - The Reward being collected
  * @param {Character} player - The palyer character
  */
 function collectReward(event, row, reward, player){
@@ -186,7 +169,7 @@ function collectReward(event, row, reward, player){
         // If we're collecting the full reward, remove it from the gui
         row.remove();
         // And remove it from the Event Rewards
-        GAME.EVENT.reward.splice(GAME.EVENT.reward.indexOf(reward), 1);
+        GAME.ENCOUNTER.get().reward.splice(GAME.ENCOUNTER.get().reward.indexOf(reward), 1);
     }
 
     // Add it to the player
@@ -197,7 +180,7 @@ function collectReward(event, row, reward, player){
  * Update the list of items that can be dropped in order to collect the reward
  * @param {Event} event - The mouseover event
  * @param {Element} row - The Row Element in the rewards table for the reward
- * @param {EVENTS.Reward} reward - The reward being collected
+ * @param {ENCOUNTERS.Reward} reward - The reward being collected
  * @param {Character} player - The player character
  */
 function updateCache(event, row, reward, player){
@@ -256,7 +239,7 @@ function updateCache(event, row, reward, player){
  * Exchanges the calculated amount of the selected item for the maximum reward quantity
  * @param {Event} event - dropdownlist.click event
  * @param {Element} row - the Reward's row to pass on to collectReward
- * @param {EVENTS.Reward} reward - the Reward being collected to pass on to collectReward
+ * @param {ENCOUNTERS.Reward} reward - the Reward being collected to pass on to collectReward
  * @param {Character} player - The player character
  */
 function exchangeCache(event, row, reward, player){
@@ -286,7 +269,7 @@ function exchangeCache(event, row, reward, player){
         collectReward(event, row, reward, player);
 
         // Add Dropped Item back into reward area
-        addRewardToEvent(new EVENTS.Reward("Weapon", item));
+        addRewardToEvent(new ENCOUNTERS.Reward("Weapon", item));
     }
     else if(type == "Item"){
         item = player.getItem(item);
@@ -305,6 +288,6 @@ function exchangeCache(event, row, reward, player){
     collectReward(event, row, reward, player);
     
     // Add Dropped Item back into reward area
-    addRewardToEvent(new EVENTS.Reward(type, newreward));
+    addRewardToEvent(new ENCOUNTERS.Reward(type, newreward));
 }
 

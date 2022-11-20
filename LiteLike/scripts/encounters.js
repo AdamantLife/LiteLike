@@ -6,9 +6,7 @@ import * as ITEMS from "./items.js";
 import { unlocks } from "./colony.js";
 import { createCombatant } from "./io.js";
 
-export const encountertype = UTILS.enumerate("combat","choice", "none");
-export const reward = UTILS.enumerate("item", "unlock" , "map" );
-
+export const encountertype = UTILS.enumerate("COMBAT","CHOICE", "CALLBACK", "MESSAGE", "NONE");
 /**
  * Reward Description parameter of various functions
  * @typedef {Object} RewardDescription
@@ -26,6 +24,43 @@ export class Reward{
     constructor(type, reward){
         this.type = type;
         this.reward = reward;
+    }
+}
+
+/**
+ * The toplevel container for Encounters. This is the object that gets assigned to
+ * GAME.ENCOUNTER and should be used to hold all event types, even if the event is
+ * standalone (i.e.- Random Combat Encounters)
+ */
+export class EncounterSequence{
+    /**
+     * 
+     * @param {Encounter[]} encounters - A list of the encounter objects to progress through
+     */
+    constructor(encounters){
+        this.encounters = Array.from(encounters);
+        // Initializing with negative index so that EncounterSequence.increment
+        // can always be called
+        this.index = -1;
+    }
+
+    /**
+     * The current encounter
+     * @returns The current encounter
+     */
+    get(){
+        return this.encounters[this.index];
+    }
+    increment(){
+        this.index+=1;
+        return this.encounters[this.index];
+    }
+    /**
+     * Adds an encounter to the EncounterSequence
+     * @param {Encounter} encounter - The encounter to add
+     */
+    addEncounter(encounter){
+        this.encounters.push(encounter);
     }
 }
 
@@ -50,7 +85,7 @@ export class Encounter{
 
 export class CombatEncounter extends Encounter{
     constructor(reward, options){
-        super("combat", reward, options);
+        super(encountertype.COMBAT, reward, options);
 
         // Initialized in initEncounter
         this.combat;
@@ -71,29 +106,38 @@ export class CombatEncounter extends Encounter{
 
 export class ChoiceEncounter extends Encounter{
     constructor(reward, options){
-        super("choice", reward, options);
+        super(encountertype.CHOICE, reward, options);
     }
     initEncounter(){
-        return {flavor: this.options.flavor, choices: this.options.choices};
+        return {message: this.options.message, choices: this.options.choices};
     }
 }
 
-export class EncounterSequence{
-    constructor(encounters){
-        this.encounters = Array.from(encounters);
-        this.index = 0;
+/**
+ * An encounter that simply displays text on the player's screen
+ */
+export class MessageEncounter extends Encounter{
+    constructor(reward, options){
+        super(encountertype.MESSAGE, reward, options);
     }
+    initEncounter(){
+        return {message: this.options.message, exitbutton: this.options.exitbutton}
+    }
+}
 
-    /**
-     * The current encounter
-     * @returns The current encounter
-     */
-    get(){
-        return this.encounters[this.index];
+/**
+ * An encounter that displays text on the player's screen
+ * and calls a callback when the message is displayed
+ */
+ export class CallbackEncounter extends MessageEncounter{
+    constructor(reward, options){
+        super(reward, options);
+        // Because MessageEncounter hard-enforces its own type we can't
+        // initialize it with our own callback and have to add it later
+        this.type = encountertype.CALLBACK
     }
-    increment(){
-        this.index+=0;
-        return this.encounters[this.index];
+    initEncounter(){
+        return {callback: this.options.callback ,message: this.options.message, exitbutton: this.options.exitbutton}
     }
 }
 
@@ -111,7 +155,7 @@ export function buildCombatEncounter(game, enemy, rewards, options){
     let tier = options.tier && options.tier !== "undefined" ? options.tier : 1;
 
     // TODO: Random Encounter
-    enemy =createCombatant(enemy, game.EVENTS.combatants, GAME.ITEMS);
+    enemy =createCombatant(enemy, game.ENCOUNTERS.combatants, game.ITEMS);
     // Invalid Enemy ID
     if(!enemy || typeof enemy == "undefined") return;
     
@@ -141,26 +185,26 @@ export function parseReward(game, reward){
     
     switch(reward.type){
         // Singletons
-        case "unlock":
+        case "Unlock":
             lookup = unlocks;
             break;
         // TODO: Include Character Unlocks
-        case "armor":
+        case "Armor":
             lookup = game.ITEMS.armor;
             break;
-        case "transport":
+        case "Transport":
             lookup = game.ITEMS.transports;
             break;
         // TODO: add Map Reward
 
         // Others
-        case "item":
+        case "Item":
             lookup = game.ITEMS.items;
             break;
-        case "weapon":
+        case "Weapon":
             lookup = game.ITEMS.weapons;
             break;
-        case "resource":
+        case "Resource":
             lookup = game.ITEMS.resources;
             break;
         }
@@ -174,20 +218,20 @@ export function parseReward(game, reward){
     if(!obj) return;
 
     // We can return Singletons immediately
-    if(["unlock", "armor", "transport", "map"].indexOf(reward.type) > -1){
+    if(["Unlock", "Armor", "Transport", "Map"].indexOf(reward.type) > -1){
         // Return Reward Object
         return new Reward(reward.type, obj);
     }
 
     // Other things require a little bit more effort
     switch(reward.type){
-        case "item":
+        case "Item":
             obj = new ITEMS.Item(obj, qty);
             break;
-        case "weapon":
+        case "Weapon":
             obj = new ITEMS.Weapon(obj);
             break;
-        case "resource":
+        case "Resource":
             obj = new ITEMS.Resource(obj, qty);
             break;
     }

@@ -2,12 +2,13 @@
 
 import {toggleAllButtons, clearDemoBox} from "./utils.js";
 import * as EQUIP from "../scripts/items.js";
-import * as EVENTS from "../scripts/events.js";
+import * as ENCOUNTERS from "../scripts/encounters.js";
 
 import * as MAP from "../scripts/map.js";
 import * as KEYBINDINGS from "../scripts/keybindings.js";
 import * as COMBATGUI from "../scripts/gui/combat.js";
-import * as EVENTSGUI from "../scripts/gui/events.js";
+import * as REWARDGUI from "../scripts/gui/reward.js";
+import * as ENCOUNTERSGUI from "../scripts/gui/encounters.js"
 
 var DEMOMAP = ".....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n..........!..........\n.....................\n..........C..........\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................";
 
@@ -122,15 +123,44 @@ export function mapDemo(){
 
     /**
      * When the player enters the colony or a port, we refill his
-     * reactorPower and give him +5 repairBots.
+     * reactorPower and give him a reward screen with 5 repair bots
      * 
-     * We do not heal him.
      */
-    function reloadResources(){
+    function collectFromCache(){
         // Top Of (max out) the transport's reactorPower
         GAME.PLAYER.equipment.transport.topOff();
-        // Give the Player +3 Repair Bots
-        GAME.PLAYER.equipment.items[0].quantity+=3;
+
+        // Create reward
+        let reward = ENCOUNTERS.parseReward(GAME, {type: "Item", id: 0, qty: 5});
+        // Create message encounter
+        let message = new ENCOUNTERS.MessageEncounter([reward,], {message: "You arrive at port and retrieve a cache of supplies your allies had left for you."})
+
+        // Add the Encounter to the GAME
+        let sequence = GAME.getOrAddEncounter(message);
+        
+        // If this is a new EncounterSequence, use cycle event to initialize it
+        if (sequence.index == -1) cycleEvent();
+    }
+
+    /**
+     * When the player enters the colony we unload all his resources
+     */
+    function visitColony(){
+        // To be lazy, we're just going to overwrite resources
+        // DEVNOTE: in actual gameplay, resources would be transferred
+        // to The Colony, but that is outside the scope of this demo
+        let callback = ()=> GAME.PLAYER.equipment.resources = {};
+        
+        // Build encounter
+        let encounter = new ENCOUNTERS.CallbackEncounter([], {
+            message: "Upon arrival in The Colony, the dockworkers unload the resources you've gathered",
+            callback
+    });
+        // Add the Encounter to the GAME
+        let sequence = GAME.getOrAddEncounter(encounter);
+        
+        // If this is a new EncounterSequence, use cycle event to initialize it
+        if (sequence.index == -1) cycleEvent();
     }
 
     /**
@@ -144,39 +174,114 @@ export function mapDemo(){
         }
 
         // Show rewards
-        EVENTSGUI.loadRewardEvent(GAME.EVENT.reward, cleanupCombat)   ;
+        REWARDGUI.loadRewardEvent(cleanupCombat)   ;
     }
 
-        function cleanupCombat(){
+    /**
+     * Removes all evnet listeners for combat and hides the combat box
+     */
+    function cleanupCombat(){
 
-            updateTravelResources();
+        // Clear all listeners
+        GAME.COMBAT.removeAllListeners();
+        GAME.COMBAT.player.removeAllListeners();
+        GAME.COMBAT.enemy.removeAllListeners();
+        // Clear combat from Game
+        GAME.COMBAT = null;
 
-            // Clear all listeners
-            GAME.COMBAT.removeAllListeners();
-            GAME.COMBAT.player.removeAllListeners();
-            GAME.COMBAT.enemy.removeAllListeners();
-            // Clear combat from Game
-            GAME.COMBAT = null;
+        // Hide combatBox and eventBox(rewards)
+        combatBox.classList.remove("shown");
+        combatBox.classList.add("hidden");
 
-            // Hide combatBox and eventBox(rewards)
-            combatBox.classList.remove("shown");
-            combatBox.classList.add("hidden");
+        // Cleanup the eventBox
+        // This will also cycle the event
+        cleanupEncounter();
+    }
+
+    /**
+     * Updates travel resources, clears the eventbox and hides it
+     */
+    function cleanupEncounter(){
+        // Make sure map is up-to-date
+        updateTravelResources();
+
+        // Clear out the eventBox
+        let eventBox = ENCOUNTERSGUI.clearEvents();
+
+        // Queue up the next event
+        let result = cycleEvent();
+        // If no more Encounters, hide eventBox
+        if(!result){
             eventBox.classList.remove("shown");
             eventBox.classList.add("hidden");
+        }
+
+        
     }
 
     /**
      * Triggers a "fight" against a Brigand
+     * @param {MapEvent} event - The enterunexplored Map event
      */
-    function portEvent(){
+    function portEvent(event){
         // Get Combat event
-        let event = EVENTS.buildCombatEncounter(GAME, 0, [{type: "resource", id: 2, qty: 10}]);
-        // Give game a reference to the event
-        GAME.EVENT = event;
-        // Initialize it
-        let combat = event.initEncounter();
-        // Use laodCombat to display it on the screen
-        COMBATGUI.loadCombat(combat, finishCombat);
+        let message = new ENCOUNTERS.MessageEncounter([], {message: "While exploring a derelict port you are ambushed by a Space Brigand!"})
+        let encounter = ENCOUNTERS.buildCombatEncounter(GAME, 0, [{type: "Resource", id: 2, qty: 10}]);
+        // Initialize the encounter on the GAME
+        // NOTE: There should be no other possible events that arise simultaneous
+        //          to the enterunexplored event, so we are not calling GAME.getOrAddEncounter
+        GAME.ENCOUNTER = new ENCOUNTERS.EncounterSequence([message, encounter]);
+        // Initialize the encounter
+        cycleEvent();
+    }
+
+    /**
+     * Initializes the next Encounter from GAME.ENCOUNTER
+     */
+    function cycleEvent(){
+        // Get the next Encounter from the Game's current EncounterSequence
+        let event = GAME.ENCOUNTER.increment();
+        // No more encounters, so clear the Sequence and exit
+        if(!event || typeof event == "undefined"){
+            GAME.ENCOUNTER = null;
+            // Return false so whatever called this knows
+            // that we are not loading another event
+            return false;
+        }
+
+        // Initialize the Encounter
+        let result = event.initEncounter();
+
+        // Load the appropriate gui with callback
+        switch(event.type){
+            case ENCOUNTERS.encountertype.COMBAT:
+                // Use loadCombat to display it on the screen
+                COMBATGUI.loadCombat(result, finishCombat);
+                // Since combat is being loaded, we do not need
+                // the event box, so let the caller know
+                return false;
+
+            case ENCOUNTERS.encountertype.MESSAGE:
+                // Use loadMessage to display it on the screen
+                ENCOUNTERSGUI.loadMessage(result, (event)=>{
+                    // Don't show rewards if event doesn't have them
+                    if(!event.reward.length) return cleanupEncounter();
+                    // Otherwise, load the Reward
+                    REWARDGUI.loadRewardEvent(cleanupEncounter)
+                });
+                break;
+            case ENCOUNTERS.encountertype.CALLBACK:
+                // Use loadCallback to display it on the screen
+                ENCOUNTERSGUI.loadCallback(result, (event)=>{
+                    // Don't show rewards if event doesn't have them
+                    if(!event.reward.length) return cleanupEncounter();
+                    // Otherwise, load the Reward
+                    REWARDGUI.loadRewardEvent(cleanupEncounter)
+                });
+                break;
+        }
+        // The next event is happening inside the eventBox, so return True
+        return true;
     }
 
     // Register callbacks
@@ -185,8 +290,14 @@ export function mapDemo(){
 
     GAME.PLAYER.addEventListener("itemschange", updateTravelResources);
     GAME.PLAYER.addEventListener("equipmentchange", updateTravelResources);
-    GAME.MAP.addEventListener("entercolony", reloadResources);
-    GAME.MAP.addEventListener("enterport", reloadResources);
+
+    // The player dumps all his collected resources at The Colony
+    GAME.MAP.addEventListener("entercolony", visitColony);
+    // At ports and The Colony the player's fuel is topped off and he can collect repair bots
+    GAME.MAP.addEventListener("entercolony", collectFromCache);
+    GAME.MAP.addEventListener("enterport", collectFromCache);
+
+    // Unexplored ports spawn a Combat Event
     GAME.MAP.addEventListener("enterunexplored", portEvent);
 
     function gameOver(message){
