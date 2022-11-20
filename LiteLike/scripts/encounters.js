@@ -137,7 +137,9 @@ export class MessageEncounter extends Encounter{
         this.type = encountertype.CALLBACK
     }
     initEncounter(){
-        return {callback: this.options.callback ,message: this.options.message, exitbutton: this.options.exitbutton}
+        let result = super.initEncounter();
+        result.callback =  this.options.callback
+        return result;
     }
 }
 

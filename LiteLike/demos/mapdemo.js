@@ -189,7 +189,7 @@ export function mapDemo(){
         // Clear combat from Game
         GAME.COMBAT = null;
 
-        // Hide combatBox and eventBox(rewards)
+        // Hide combatBox
         combatBox.classList.remove("shown");
         combatBox.classList.add("hidden");
 
