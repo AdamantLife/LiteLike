@@ -32,17 +32,17 @@ export function showEvents(eventBox){
  * @param {Object} encounteroptions- The return of MessageEncounter.initEncounter
  * @param {String} encounteroptions.message - The message to display
  * @param {String} [encounteroptions.exitbutton=Continue] - The label for the exit button
- * @param {Function} callback - The function called when the exit button is pushed
+ * @param {Function} encounteroption.onexit - The function called when the exit button is pushed
  */
-export function loadMessage(encounteroptions, callback){
+export function loadMessage(encounteroptions){
     // Get and clear Event box
     let eventBox = clearEvents();
     let buttontext = encounteroptions.exitbutton;
     if(!buttontext || typeof buttontext == "undefined") buttontext = "Continue";
 
     eventBox.insertAdjacentHTML('beforeend',`<p>${encounteroptions.message}</p><button id="eventexit">${buttontext}</button>`);
-    // Callback for the eventexit button provides the GAME's current encounter
-    eventBox.querySelector("#eventexit").onclick = ()=>callback(GAME.ENCOUNTER.get());
+    // Attach the exit callback
+    eventBox.querySelector("#eventexit").onclick = encounteroptions.onexit;
 
     // Show event box if it isn't already
     showEvents(eventBox);
@@ -55,9 +55,9 @@ export function loadMessage(encounteroptions, callback){
  * @param {String} encounteroptions.message - The message to display
  * @param {Function} encounteroptions.callback - The Callback to call after the message is displayed
  * @param {String} [encounteroptions.exitbutton=Continue] - The label for the exit button
- * @param {Function} callback - The function called when the exit button is pushed
+ * @param {Function} encounteroptions.onexit - The function called when the exit button is pushed
  */
- export function loadCallback(encounteroptions, callback){
-    loadMessage(encounteroptions, callback);
+ export function loadCallback(encounteroptions){
+    loadMessage(encounteroptions);
     encounteroptions.callback();
 }

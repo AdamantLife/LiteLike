@@ -20,10 +20,18 @@ const PLAYERSYMBOL = "@";
 // Colony Symbol
 const COLONYSYMBOL = "C";
 // Port Symbols
-const UNEXPLOREDPORT = "!"
+// Port is a Structure that you cleared previously
+// and revist to pickup some travelling supplies
 const PORTSYMBOL = "#";
+// Unexplored Port is our equivalent of a House
+// In A Dark Room
+const UNEXPLOREDPORT = "!"
+// Station Symbol
+// This is our version of a City from ADR
+const STATIONSYMBOL = "$";
 // Dungeon Symbol
-const DUNGEONSYMBOL = "$";
+// This is what we call Mines from ADR
+const DUNGEONSYMBOL = "&";
 
 export const directions = UTILS.enumerate("NORTH","EAST","SOUTH","WEST");
 
@@ -53,6 +61,7 @@ export class Map extends UTILS.EventListener{
         "enterunexplored", "leaveunexplored",
         "enterport", "leaveport",
         "enterdungeon", "leavedungeon",
+        "enterstation", "leavestation",
         "entercolony", "leavecolony"
     );
 
@@ -190,6 +199,8 @@ export class Map extends UTILS.EventListener{
                 case PORTSYMBOL:
                     eventtype = Map.EVENTTYPES.leaveport;
                     break;
+                case STATIONSYMBOL:
+                    eventtype = Map.EVENTTYPES.leavestation;
                 case DUNGEONSYMBOL:
                     eventtype = Map.EVENTTYPES.leavedungeon;
                     break;
@@ -208,10 +219,13 @@ export class Map extends UTILS.EventListener{
                 case PORTSYMBOL:
                     eventtype = Map.EVENTTYPES.enterport;
                     break;
+                case STATIONSYMBOL:
+                    eventtype = Map.EVENTTYPES.enterstation;
                 case DUNGEONSYMBOL:
                     eventtype = Map.EVENTTYPES.enterdungeon;
                     break;
             }
+            
             if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: Map.playerLocation, destination});
 
             // Update player's location

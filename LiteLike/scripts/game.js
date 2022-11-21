@@ -3,7 +3,7 @@
 import {PlayerCharacter, roles} from "./character.js";
 import { TheColony } from "./colony.js";
 import {Map} from "./map.js";
-import { EncounterSequence } from "./encounters.js";
+import { Encounter, EncounterSequence } from "./encounters.js";
 
 import * as IO from "./io.js";
 import * as EQUIP from "./items.js";
@@ -100,7 +100,7 @@ export class Game{
      * If it is, adds the Encounter to the end of the Sequence.
      * Otherwise, creates a new EncounterSequence with the given Encounter
      * @param {Encounter} encounter - The encounter to add
-     * @returns - The Game's current EncounterSequence
+     * @returns {EncounterSequence} - The Game's current EncounterSequence
      */
     getOrAddEncounter(encounter){
         if(!this.ENCOUNTER){
