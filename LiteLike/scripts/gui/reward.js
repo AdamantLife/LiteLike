@@ -10,11 +10,9 @@ export class RewardsGui{
      * 
      * @param {Object} encounteroptions - The result of RewardEncounter.initEncounter
      * @param {ENCOUNTERS.Reward[]} encounteroptions.rewards - An array of Reward objects
-     * @param {Function} callback - The exit callback to call on close
      */
-    constructor(encounteroptions, callback){
+    constructor(encounteroptions){
         this.encounteroptions = encounteroptions;
-        this.callback = callback;
     }
 
     get game(){return this.encounteroptions.game;}
@@ -30,7 +28,7 @@ export class RewardsGui{
         // Add main, reward table, and close button
         eventBox.insertAdjacentHTML('beforeend', `<div class="eventsmain"><table><tbody id="rewardarea"></tbody</table></div><button id="eventexit">Close</button>`);
         // Attach exit callback
-        document.getElementById("eventexit").onclick = this.callback;
+        document.getElementById("eventexit").onclick = this.encounteroptions.onexit;
         
         // Add rewards
         for(let reward of rewards){

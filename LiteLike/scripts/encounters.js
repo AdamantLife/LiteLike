@@ -15,6 +15,32 @@ export const encountertype = UTILS.enumerate("COMBAT","CHOICE", "CALLBACK", "MES
  * @property {Number} qty - Quantity of the item
  */
 
+/**
+ * Here is a master list of all possible Encounter Options.
+ * @typedef {Object} EncounterOptions
+ * @property {Game} game - The GAME object
+ * @property {String} exitbutton - Text to display on the exitbutton
+ * @property {Function} onexit - Callback to attach to the exitbutton
+ * 
+ * // CombatEncounters
+ * * @param {Character} [options.enemy] - The Enemy for the encounter
+ * 
+ * // ChoiceEncounters
+ * @param {String} [options.message] - The Message to display to the user
+ * @param {Choice[]} [option.choices] - Choice for the player to choose between
+ * @param {Function} [option.callback] - A callback to resolve the Player's choice
+ * 
+ * // RewardEncounters
+ * @param {Reward[]} [options.rewards] - A list of rewards to give the player
+ * 
+ * // MessageEncounter
+ * @param {String} [options.message] - The message to display
+ * 
+ * // CallbackEncounter (Subclass of MessageEncounter)
+ * @param {String} [options.message] - The message to display
+ * @param {Function} [options.callback] - The function to invoke when the message is displayed
+ */
+
 export class Reward{
     /**
      * Initializes a new Reward Object
@@ -49,7 +75,7 @@ export class Choice{
 export class EncounterSequence{
     /**
      * 
-     * @param {Encounter[]} encounters - A list of the encounter objects to progress through
+     * @param {(Encounter|EncounterSequence)[]} encounters - A list of the encounter objects to progress through
      */
     constructor(encounters){
         this.encounters = Array.from(encounters);
@@ -59,22 +85,94 @@ export class EncounterSequence{
     }
 
     /**
-     * The current encounter
+     * The current encounter. If the current encounter index is a sub Sequence,
+     * returns that subsequence's current encounter instead.
      * @returns The current encounter
      */
     get(){
-        return this.encounters[this.index];
+        let result = this.encounters[this.index];
+        
+        // Don't bother checking for sub Sequence if we don't have this index
+        if(!result || typeof result == "undefined") return result;
+
+        // If we're currently in a sub Sequence, return that sequence's get instead
+        if(result.constructor.name == "EncounterSequence"){
+            return result.get();
+        }
+
+        return result;
     }
+
+    /**
+     * Increments the current index. If the current encounter index is
+     * another EncounterSequence, increments that Encounter Sequence instead;
+     * if that EncounterSequence cannot be incremented, increments as normal.
+     * @returns {Encounter | null} - Returns the Encounter at the new index, or null if the index is greater than the Sequence length
+     */
     increment(){
+        let result = this.encounters[this.index];
+
+        // Don't bother checking for sub Sequence if we don't have this index
+        // and the index is not -1 (brand new Sequence)
+        if((!result || typeof result == "undefined") && this.index !== -1) return result;
+        
+        // If we're currently on a Subsequence, increment that instead
+        // Index -1 is always going to be undefined, so don't do this check for that index
+        if(this.index > -1 && result.constructor.name == "EncounterSequence"){
+            // Result is actually the result of the Subseqeunce
+            result = result.increment();
+
+            // Return the subsequence's result if it has one
+            if(result) return result;
+
+            // If it doesn't have one, we'll increment our index like normal
+        }
         this.index+=1;
-        return this.encounters[this.index];
+        result = this.encounters[this.index];
+
+        // If no more Encounters just return
+        if(!result || typeof result == "undefined") return result;
+
+        // If the new result is a subsequence, return that subsequence's next increment
+        if(result.constructor.name == "EncounterSequence") return result.increment();
+
+        // Otherwise, we'll return the the Encounter at the new index
+        return result;
     }
     /**
      * Adds an encounter to the EncounterSequence
-     * @param {Encounter} encounter - The encounter to add
+     * @param {Encounter | EncounterSequence} encounter - The encounter to add
      */
     addEncounter(encounter){
         this.encounters.push(encounter);
+
+        /**
+         * NOTE- this condition arises because we previously tried to increment past
+         *      the end of the encounters array.
+         * 
+         * When we add a new encounter, the expectations is that the encounter will be
+         * incremented to eventually, but that will not happen if we are already at/past
+         * its index
+         * 
+         * We don't want to undo failed increments, because then EncounterSequence.get
+         * will not return undefined  and it will look like we still have more Encounters
+         * to cycle through; this results in the last Encounter in a Sequence repeating
+         * indefinitely.
+         * 
+         * Resetting index to the Encounter previous to the added Encounter is a simple
+         * fix; it's unlikely that EncounterSequence.get will be called to populate the
+         * GUI without first calling EncounterSequence.increment to move to the added
+         * Encounter
+         */
+        if(this.index >= this.encounters.length) this.index = this.encounters.length - 1;
+    }
+
+    /**
+     * Adds all events from the provided EncounterSequence to the end of this sequence
+     * @param {EncounterSequence} encountersequence 
+     */
+    extendSequence(encountersequence){
+        this.encounters.push(...encountersequence.encounters);
     }
 }
 
@@ -94,18 +192,17 @@ export class Encounter{
         this.type = type;
 
         this.options = {...options};
-        this.game; 
     }
 
-    initEncounter(game){
-        this.game = game;
-        return {game, exitbutton: this.options.exitbutton, onexit: this.options.onexit}
+    initEncounter(){
+        return {game: this.options.game, exitbutton: this.options.exitbutton, onexit: this.options.onexit}
     }
 }
 
 export class CombatEncounter extends Encounter{
     /**
      * @param {Object} options - Encounter Options
+     * @param {Character} options.enemy - The Enemy for the encounter
      */
     constructor(options){
         super(encountertype.COMBAT, options);
@@ -115,12 +212,11 @@ export class CombatEncounter extends Encounter{
     }
     /**
      * Initializes a new Combat instance using the supplied game and enemy.
-     * @param {Game} game - The game object to initialize with. Can be null or undefined if game is assigned in CombatEncounter.options
      * @returns {Combat}- The combat object which is also accessible via this.combat
      */
-    initEncounter(game){
-        let result = super.initEncounter(game)
-        this.combat = new Combat(this.game.PLAYER.getCombatCharacter(), this.options.enemy);
+    initEncounter(){
+        let result = super.initEncounter()
+        this.combat = new Combat(this.options.game.PLAYER.getCombatCharacter(), this.options.enemy);
         result.combat = this.combat;
         return result;
     }
@@ -138,8 +234,8 @@ export class ChoiceEncounter extends Encounter{
         super(encountertype.CHOICE, options);
     }
 
-    initEncounter(game){
-        let result = super.initEncounter(game);
+    initEncounter(){
+        let result = super.initEncounter();
         // We'll need to initialize the cost for each choice
         let choices = [];
         for(let choice of this.options.choices){
@@ -154,11 +250,11 @@ export class ChoiceEncounter extends Encounter{
                 // Sort out Items and Resources
                 if(cost.type == "Item"){
                     // Initialize cost as a Resource
-                    let itype = this.game.ITEMS[cost.id];
+                    let itype = this.options.game.ITEMS.items[cost.id];
                     costs.push(new ITEMS.Item(itype, cost.qty));
                 }else if(cost.type == "Resource"){
                     // Initialize cost as a Resource
-                    let rtype = this.game.RESOUCES[cost.id];
+                    let rtype = this.options.game.ITEMS.resources[cost.id];
                     costs.push(new ITEMS.Resource(rtype, cost.qty));
                 }
             }
@@ -179,11 +275,11 @@ export class RewardEncounter extends Encounter{
         super(encountertype.REWARD, options);
     }
 
-    initEncounter(game){
-        let result = super.initEncounter(game);
+    initEncounter(){
+        let result = super.initEncounter();
         result.rewards = [];
         for(let r of this.options.rewards){
-            result.rewards.push(parseReward(this.game, r));
+            result.rewards.push(parseReward(this.options.game, r));
         }
         return result;
     }
@@ -201,8 +297,8 @@ export class MessageEncounter extends Encounter{
     constructor(options){
         super(encountertype.MESSAGE, options);
     }
-    initEncounter(game){
-        let result = super.initEncounter(game);
+    initEncounter(){
+        let result = super.initEncounter();
         result.message = this.options.message;
         return result
     }
@@ -224,8 +320,8 @@ export class MessageEncounter extends Encounter{
         // initialize it with our own callback and have to add it later
         this.type = encountertype.CALLBACK
     }
-    initEncounter(game){
-        let result = super.initEncounter(game);
+    initEncounter(){
+        let result = super.initEncounter();
         result.callback =  this.options.callback
         return result;
     }
@@ -271,8 +367,8 @@ export function buildCombatEncounter(game, enemy, rewards, onexit, options){
     let rewardexit = onexit;
     if(options.rewardexit && typeof options.rewardexit !== "undefined") rewardexit = options.rewardexit;
 
-    let combat = new CombatEncounter({enemy, onexit: combatexit});
-    let reward = new RewardEncounter({rewards: rewardobjs, onexit: rewardexit});
+    let combat = new CombatEncounter({game, enemy, onexit: combatexit});
+    let reward = new RewardEncounter({game, rewards: rewardobjs, onexit: rewardexit});
 
     let encounterlist = [combat, reward];
 
@@ -281,7 +377,7 @@ export function buildCombatEncounter(game, enemy, rewards, onexit, options){
         let messageexit = onexit;
         if(options.messageexit && typeof options.messageexit !== "undefined") messageexit = options.messageexit;
 
-        let message = new MessageEncounter({message: options.message, onexit: messageexit});
+        let message = new MessageEncounter({game, message: options.message, onexit: messageexit});
         
         // Insert MessageEncounter at the front of the list
         encounterlist.splice(0,0,message);

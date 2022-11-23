@@ -10,7 +10,7 @@ import * as COMBATGUI from "../scripts/gui/combat.js";
 import * as REWARDSGUI from "../scripts/gui/reward.js";
 import * as ENCOUNTERSGUI from "../scripts/gui/encounters.js"
 
-var DEMOMAP = ".....................\n.....................\n.....................\n.....................\n.....................\n.....................\n....$................\n.....................\n..........!..........\n.....................\n..........C..........\n.....................\n................&....\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................";
+var DEMOMAP = ".....................\n.....................\n.....................\n.....................\n.....................\n.....................\n......$..............\n.....................\n..........!..........\n.....................\n..........C..........\n.....................\n................&....\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................\n.....................";
 
 export function mapDemo(){
     // Disable all buttons to avoid shenanigans
@@ -25,6 +25,9 @@ export function mapDemo(){
     GAME.PLAYER.equipment.weapons.push(new EQUIP.Weapon(GAME.ITEMS.weapons[2]))
     // Give Player Batteries for Laser Pistol
     GAME.PLAYER.equipment.resources[1] = new EQUIP.Resource(GAME.ITEMS.resources[1], 5);
+    // Give Player a better Transport for the Demo
+    GAME.PLAYER.equipment.transport = GAME.ITEMS.transports[1];
+    GAME.PLAYER.equipment.transport.topOff();
 
 
     // Initialize a new Map and set the Map maunally
@@ -131,9 +134,9 @@ export function mapDemo(){
         let callback = ()=>GAME.PLAYER.equipment.transport.topOff();
 
         // Create message encounter
-        let message = new ENCOUNTERS.CallbackEncounter({message: "You arrive at port and retrieve a cache of supplies your allies had left for you.", callback})
+        let message = new ENCOUNTERS.CallbackEncounter({game: GAME, message: "You arrive at port and retrieve a cache of supplies your allies had left for you.", callback, onexit: cycleEvent})
         // Create reward encounter
-        let reward = new ENCOUNTERS.RewardEncounter({rewards:[{type: "Item", id: 0, qty: 5}]});
+        let reward = new ENCOUNTERS.RewardEncounter({game: GAME, rewards:[{type: "Item", id: 0, qty: 5}], onexit: cycleEvent});
 
         // Add the MessageEncounter to the GAME, getting back the current sequence
         let sequence = GAME.getOrAddEncounter(message);
@@ -171,8 +174,10 @@ export function mapDemo(){
         
         // Build encounter
         let encounter = new ENCOUNTERS.CallbackEncounter({
+            game: GAME, 
             message: "Upon arrival in The Colony, the dockworkers unload the resources you've gathered",
-            callback: dropResources
+            callback: dropResources,
+            onexit: cycleEvent
     });
         // Add the Encounter to the GAME
         let sequence = GAME.getOrAddEncounter(encounter);
@@ -192,24 +197,19 @@ export function mapDemo(){
         }
 
         // Cycle to next event
-        cycleEvent(ENCOUNTERS.encountertype.COMBAT)
+        cycleEvent()
     }
 
     /**
      * Removes all evnet listeners for combat and hides the combat box
      */
     function cleanupCombat(){
-
         // Clear all listeners
         GAME.COMBAT.removeAllListeners();
         GAME.COMBAT.player.removeAllListeners();
         GAME.COMBAT.enemy.removeAllListeners();
         // Clear combat from Game
         GAME.COMBAT = null;
-
-        // Hide combatBox
-        combatBox.classList.remove("shown");
-        combatBox.classList.add("hidden");
     }
 
     /**
@@ -218,12 +218,6 @@ export function mapDemo(){
     function cleanupEncounter(){
         // Make sure map is up-to-date
         updateTravelResources();
-
-        // Clear out the eventBox
-        let eventBox = ENCOUNTERSGUI.clearEvents();
-
-        eventBox.classList.remove("shown");
-        eventBox.classList.add("hidden");        
     }
 
     /**
@@ -259,42 +253,154 @@ export function mapDemo(){
         // or by Map Completion (longer dungeons later in the game)
         let maxFloor = 5;
 
+        // Recording the eventtype here so we don't have to dig for it each time
+        let eventtype = event.eventtype == MAP.Map.EVENTTYPES.enterstation ? "station" : "dungeon";
+
         /**
          * The callback for each each encounter (instead of cycleEvent)
          * It generates a new Encounter and adds it to the EncounterSequence
+         * @param {ENCOUNTERS.EncounterSequence} sequence - this Station/Dungeon's Encounter Sequence
          */
         function buildNextSegment(sequence){
-            // We generate the dungeon based on the current floor
-            // I think it's best to increment the difficulty every couple of floors
-            let tier = floor % 2;
+            // Each floor might have multiple scenes, so we receive an EncounterSequence back
+            // by default
+            let encounterSequence;
 
-            let encounter
-            // Floor 0 is always an introductory message
-            if(floor == 0){
-                let message;
-                // NOTE: To reiterate the above DEVNOTE- all of these encounters would
-                //          normally be randomly generated
-                if(event.eventtype == MAP.Map.EVENTTYPES.enterstation){
-                    message = "You happen upon a station and dock with it to see how its inhabitants are fairing.";
-                }else{ // Map.enterdungeon
-                    message = "You come across a planet.\nyour sensor indicate it possesses valuable resources so you decide to investigate.";
-                }
-                encounter= new ENCOUNTERS.MessageEncounter({message, onexit: ()=>buildNextSegment(sequence)})
+            // On exit is a recursion back to this function
+            let onexit = ()=>buildNextSegment(sequence);
+
+            // Delegate to the individual floor builders
+            if (eventtype == "station"){
+                encounterSequence = buildStation(floor, onexit);
             }
-
-            // Add the new encounter
-            sequence.addEncounter(encounter);
+            // eventtype == "dungeon"
+            else {
+                encounterSequence = buildDungeon(floor, onexit);
+            }            
+            
+            // Update the floor for the next iteration
+            floor += 1;
+            // Add the new sequence
+            sequence.addEncounter(encounterSequence);
             // Increment the Sequence's index
             sequence.increment();
             // Update the GUI to load the encounter
-            updateSequenceGUI();
+            ENCOUNTERSGUI.updateSequenceGUI(sequence, cleanupEncounter, cleanupCombat);
         }
 
-        // Start a new Seqeunce
-        GAME.ENCOUNTER = new ENCOUNTERS.EncounterSequence();
+        // Start an empty Seqeunce
+        GAME.ENCOUNTER = new ENCOUNTERS.EncounterSequence([]);
         // Build the first Segement
         // buildNextSegment will recurse after this point
         buildNextSegment(GAME.ENCOUNTER);
+    }
+
+    /**
+     * "Randomly" generates a single floor (encounter) of the Station (see DEVNOTE on dungeonStationEvent)
+     * @param {Number} floor - The floor the of the Station
+     * @param {Function} onexit - The onexit callback for the Encounter. Because these are dynamically created
+     *                              by dungeonStationEvent, they have to be supplied when this function is called
+     * @returns {ENCOUNTERS.EncounterSequence} - An EncounterSequence for that floor
+     */
+    function buildStation(floor, onexit){
+        // We generate the dungeon based on the current floor
+        // I think it's best to increment the difficulty every couple of floors
+        let tier = Math.floor(floor / 2);
+
+        let encounterSequence = new ENCOUNTERS.EncounterSequence([]);
+
+        // Floor 0 is always an introductory message
+        if(floor == 0){
+            // NOTE: To reiterate the above DEVNOTE- all of these encounters would
+            //          normally be randomly generated            
+            let encounter= new ENCOUNTERS.MessageEncounter({game: GAME, message : "You happen upon a station. You dock with it to see how its inhabitants are fairing.", onexit})
+            encounterSequence.addEncounter(encounter);
+        }
+        else if(tier == 0){
+            
+            /**
+             * Callback for this ChoiceEncounter
+             * @param {Choice.value} value - The value of the selected choice
+             */
+            function traderCallback(value){
+
+                let callback = ()=>{
+                    // While value could stand for anything, in this case we can just use it as the selected quantity
+                    // Player is gauranteed to 
+                    GAME.PLAYER.getResource(2).quantity-= value;
+                    // Here we're going to give the player the same amount of
+                    // resources unless he gets greedy
+                    let gain = value;
+                    if(value == 10) gain = 0;
+                    // Give the player the Resource
+                    GAME.PLAYER.getResource(1).quantity+= gain;
+                    // Trigger callback
+                    GAME.PLAYER.triggerEvent("resourceschange", {1: GAME.PLAYER.getResource(1), 2:GAME.PLAYER.getResource(2)});
+                }
+
+                // Message reflects the above note
+                let message = "The Trader happily does business with you and gives you some especially high quality batteries.";
+                if(value == 10) message = "The Trader takes your scrap and says he'll be right back with your batteries.\n\n\n... You never see him again..."
+
+
+                let encounter = new ENCOUNTERS.CallbackEncounter({
+                    game: GAME, 
+                    message,
+                    callback,
+                    onexit
+                });
+
+                // Add this encounter to this floor's EncounterSequence
+                encounterSequence.addEncounter(encounter);
+
+                // Load this new Encounter into the GUI
+                encounterSequence.increment();
+                ENCOUNTERSGUI.updateSequenceGUI(encounterSequence);
+
+            }
+            let encounter = new ENCOUNTERS.ChoiceEncounter({
+                game: GAME,
+                message: "You come across a trader willing to exchange scrap for batteries.",
+                choices:[
+                    {value: 1, flavor: "Trade 1 Scrap for 1 Battery", cost:[{type:"Resource", id: 2, qty:1}]},
+                    {value: 5, flavor: "Trade 5 Scrap for 5 Batteries", cost:[{type:"Resource", id: 2, qty:5}]},
+                    {value: 10, flavor: "Trade 10 Scrap for 50 Batteries", cost:[{type:"Resource", id: 2, qty:10}]}
+                ],
+                exitbutton: "Do not Trade",
+                onexit,
+                callback: traderCallback
+            });
+            encounterSequence.addEncounter(encounter);
+        }
+
+        // Returning the generated EncounterSequence for the floor
+        return encounterSequence;
+    }
+
+    /**
+     * "Randomly" generates a single floor (encounter) of the Dungeon (see DEVNOTE on dungeonStationEvent)
+     * @param {Number} floor - The floor the of the Dungeon
+     * @param {Function} onexit - The onexit callback for the Encounter. Because these are dynamically created
+     *                              by dungeonStationEvent, they have to be supplied when this function is called
+     * @returns {Encounter} - The encounter for that floor
+     */
+     function buildDungeon(floor, onexit){
+        // We generate the dungeon based on the current floor
+        // I think it's best to increment the difficulty every couple of floors
+        let tier = floor % 2;
+
+        let encounter;
+
+        // Floor 0 is always an introductory message
+        if(floor == 0){
+            // NOTE: To reiterate the above DEVNOTE- all of these encounters would
+            //          normally be randomly generated
+            encounter= new ENCOUNTERS.MessageEncounter({game: GAME, message:"You come across a planet.\nYour sensors indicate it possesses valuable resources so you decide to investigate.", onexit})
+        }
+        else if(tier == 0){
+
+        }
+        return encounter;
     }
 
     /**
@@ -306,64 +412,10 @@ export function mapDemo(){
         // Increment the EncounterSequence
         GAME.ENCOUNTER.increment();
         // And then load the next encounter
-        updateSequenceGUI();
-    }
+        let [encounter, encounteroptions] = ENCOUNTERSGUI.updateSequenceGUI(GAME.ENCOUNTER, cleanupEncounter, cleanupCombat);
 
-    /**
-     * Populates the GUI for the current Encounter and removes unneeded Elements
-     */
-    function updateSequenceGUI(){
-        // Establish any popups are currently visible so we know how to handle them
-        let currentPopups = {
-            combat: document.getElementById("combat").classList.contains("shown"),
-            event: document.getElementById("events").classList.contains("shown")
-        }
-        
-        // Get the current Encounter
-        let event = GAME.ENCOUNTER.get();
-        // No more encounters
-        if(!event || typeof event == "undefined"){
-            // clear the Sequence on GAME
-            GAME.ENCOUNTER = null;
-            
-            // Combat is currently being show, so hide it
-            if(currentPopups.combat) cleanupCombat();
-            // A non-Combat encounter is bing shown, so hide it
-            if(currentPopups.event) cleanupEncounter();
-            // Exit
-            return;
-        }
-
-        // Initialize the Encounter
-        let result = event.initEncounter(GAME);
-
-        let gui;
-        // Load the appropriate gui with callback
-        switch(event.type){
-            case ENCOUNTERS.encountertype.COMBAT:
-                gui = new COMBATGUI.CombatGui(result);
-                gui.loadCombat();
-                // If we have a non-combat popup, clear it
-                if(currentPopups.event) cleanupEncounter();
-                // We're returning here so we can auto-hide the Combat Popup
-                // if it is up for all other encounter types
-                return;
-
-            case ENCOUNTERS.encountertype.MESSAGE:
-                // Use loadMessage to display it on the screen
-                ENCOUNTERSGUI.loadMessage(result);
-                break;
-            case ENCOUNTERS.encountertype.CALLBACK:
-                // Use loadCallback to display it on the screen
-                ENCOUNTERSGUI.loadCallback(result);
-                break;
-            case ENCOUNTERS.encountertype.REWARD:
-                gui = new REWARDSGUI.RewardsGui(result);
-                gui.loadRewardEvent();
-                break;
-        }
-        // Any other type of encounter is Non-Combat, so hide the Combat div
-        if(currentPopups.combat) cleanupCombat();
+        // If our current EncounterSequence is done, remove the Sequence from GAME
+        if(!encounter) GAME.ENCOUNTER = null;
     }
 
     // Register callbacks

@@ -201,6 +201,7 @@ export class Map extends UTILS.EventListener{
                     break;
                 case STATIONSYMBOL:
                     eventtype = Map.EVENTTYPES.leavestation;
+                    break;
                 case DUNGEONSYMBOL:
                     eventtype = Map.EVENTTYPES.leavedungeon;
                     break;
@@ -221,6 +222,7 @@ export class Map extends UTILS.EventListener{
                     break;
                 case STATIONSYMBOL:
                     eventtype = Map.EVENTTYPES.enterstation;
+                    break;
                 case DUNGEONSYMBOL:
                     eventtype = Map.EVENTTYPES.enterdungeon;
                     break;

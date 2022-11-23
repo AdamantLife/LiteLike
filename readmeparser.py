@@ -11,7 +11,7 @@ class Session:
 @dataclasses.dataclass
 class Segment:
     start: datetime.datetime
-    end: datetime.datetime
+    end: datetime.datetime = None
 
     @property
     def duration(self):
@@ -32,9 +32,22 @@ def parse(file: str = None):
         
         while (line := f.readline()):
             if (result := SERE.search(line)):
+                ## Sanity checking
+                if sessions and sessions[-1].segments and not sessions[-1].segments[-1].end:
+                    raise RuntimeError(f"Did not parse a complete Segment prior to new Session: {line}")
                 sessions.append(Session(int(result.group("sessionnumber"))))
                 continue
             if (result := DTRE.search(line)):
                 dt = result.group("datetime")
                 dt = datetime.datetime.strptime(dt, "%m-%d-%Y %I:%M%p")
-                
+                if result.group("type").lower() == "start":
+                    ## Sanity checking
+                    if sessions[-1].segments and not sessions[-1].segments[-1].end:
+                        raise RuntimeError(f"Did not parse a complete Segment prior to new Segment: {line}")
+                    sessions[-1].segments.append(Segment(dt))
+                    continue
+                else:
+                    ## Sanity checking
+                    if sessions[-1].segments[-1].end:
+                        raise RuntimeError(f"Parsed a duplicate Segment End prior to: {line}")
+                    sessions[-1].segments[-1].end = dt

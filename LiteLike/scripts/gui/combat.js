@@ -128,10 +128,10 @@ export class CombatGui{
         // Clear combatBox
         while(combatBox.lastElementChild) combatBox.removeChild(combatBox.lastElementChild);
         // Insert Player Character
-        combatBox.insertAdjacentHTML('beforeend', buildStatBlock(this.combat.player, true, true));
+        combatBox.insertAdjacentHTML('beforeend', this.buildStatBlock(this.combat.player, true, true));
         // Insert Enemy Character
         // NOTE: currently we are never displaying weapons or items for enemy
-        combatBox.insertAdjacentHTML('beforeend', buildStatBlock(this.combat.enemy, false, false));
+        combatBox.insertAdjacentHTML('beforeend', this.buildStatBlock(this.combat.enemy, false, false));
 
         // Loadout population is repetative, so we're combining everything
         // We start out per-character
@@ -143,8 +143,8 @@ export class CombatGui{
             // Both tables are popuplated the same way, but we need to know where to find the loadout,
             // how much of each loadout to populate, and what happens when the button is pushed
             for( let [table, loadout, loadoutlength, callback] of [
-                [weaponstable, character.weapons, CHARACTER.CHARAWEAPONLOADOUT, this.useWeapon],
-                [itemstable, character.items, CHARACTER.CHARAITEMLOADOUT, this.useItem]
+                [weaponstable, character.weapons, CHARACTER.CHARAWEAPONLOADOUT, this.useWeapon.bind(this)],
+                [itemstable, character.items, CHARACTER.CHARAITEMLOADOUT, this.useItem.bind(this)]
             ]){
                 // If table is not displayed, skip populating the loadout
                 // NOTE: Currently we are never displaying the enemy weapons or items
@@ -212,9 +212,8 @@ export class CombatGui{
     /**
      * Assigns a combat object to GAME and begins the screen transition
      * to the Combat Popup
-     * @param {Function}  encounteroptions.onexit - The callback to call when the combat is finished
      */
-    loadCombat(finishCombat){
+    loadCombat(){
         let combatBox = document.getElementById("combat");
         let player = this.combat.player;
         let enemy = this.combat.enemy;
@@ -229,7 +228,7 @@ export class CombatGui{
         let enemyBox = combatBox.querySelector(`div[data-combatant="enemy"]`);
 
         // Add listeners
-        this.combat.addEventListener("endcombat", finishCombat);
+        this.combat.addEventListener("endcombat", this.encounteroptions.onexit);
         // GUI Updates
         this.combat.addEventListener("useweapon", this.updateInput.bind(this));
         this.combat.addEventListener("useitem", this.updateInput.bind(this));
