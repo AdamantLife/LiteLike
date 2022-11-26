@@ -37,7 +37,7 @@ export function showEvents(eventBox){
  * Populates the GUI for the current Encounter in the provided EncounterSequence and removes unneeded Elements.
  * If Sequence.get does not return an Encounter, the Combat and Event windows will be cleaned up.
  * 
- * @param {ENCOUNTERS.EncounterSequence} - The Sequence to populate the GUI with.
+ * @param {ENCOUNTERS.EncounterSequence | null} - The Sequence to populate the GUI with. Can be null/false in order to just run the cleanup
  * @param {Function} [cleanupCombat] - An optional callback to execute if the Combat Popup is being cleaned up
  * @param {Function} [cleanupEncounter] - An optional callback to execute if the Event Popup is being cleaned up
  * 
@@ -52,7 +52,6 @@ export function updateSequenceGUI(sequence, cleanupEncounter, cleanupCombat){
         combat: combatBox.classList.contains("shown"),
         event: eventBox.classList.contains("shown")
     }
-
 
 
     function encounterCleanup(){
@@ -75,10 +74,15 @@ export function updateSequenceGUI(sequence, cleanupEncounter, cleanupCombat){
         combatBox.classList.add("hidden");
     }
 
-    // Get the current Encounter
-    let event = sequence.get();
+    // We're allowing sequence to be null so we can use this
+    // function to just clean stuff up
+    let event
+    if(sequence){
+        // Get the current Encounter
+        event = sequence.get();
+    }
     // No more encounters
-    if(!event || typeof event == "undefined"){
+    if(!sequence || !event || typeof event == "undefined"){
 
         // Combat is currently being show, so hide it
         if(currentPopups.combat)combatCleanup;
@@ -174,9 +178,11 @@ export function loadMessage(encounteroptions){
     // Get and clear Event box
     let eventBox = clearEvents();
     let buttontext = encounteroptions.exitbutton;
-    if(!buttontext || typeof buttontext == "undefined") buttontext = "Continue";
+    // In terms of display, sometimes it's better for Choice Encounters to not display the exit button
+    // and rather use an option as the exitbutton instead. This is indicated by passing false;
+    if((!buttontext && buttontext !== false) || typeof buttontext == "undefined") buttontext = "Continue";
 
-    eventBox.insertAdjacentHTML('beforeend',`<p>${encounteroptions.message}</p><table><tbody class="choicetable"></tbody></table><button id="eventexit">${buttontext}</button>`);
+    eventBox.insertAdjacentHTML('beforeend',`<p>${encounteroptions.message}</p><table><tbody class="choicetable"></tbody></table>${buttontext ? `<button id="eventexit">${buttontext}</button>`: ``}`);
 
     // Populate the Choice Table
     let body = eventBox.querySelector("tbody.choicetable");
@@ -191,7 +197,7 @@ export function loadMessage(encounteroptions){
         // Get reference to button
         let button = body.lastElementChild.querySelector("td:last-of-type>button");
         // Set Button callback in the last/most-recent td
-        button.onclick = ()=>encounteroptions.callback(choice.value);
+        button.onclick = ()=>encounteroptions.callback(choice);
         // Check if player can afford the costs
         for(let cost of choice.cost){
             // Figure out where we're in the Player's inventory the Object is
@@ -200,7 +206,6 @@ export function loadMessage(encounteroptions){
             if(cost.constructor.name == "Item") available = encounteroptions.game.PLAYER.getItem(cost.type.id);
             else if(cost.constructor.name == "Resource") available = encounteroptions.game.PLAYER.getResource(cost.type.id);
 
-            console.log(available, cost);
             // Player doesn't have any or has less than the cost
             // so can't choose this option
             if(!available || available.quantity < cost.qty){
@@ -212,11 +217,7 @@ export function loadMessage(encounteroptions){
     }
 
     // Because ChoiceEncounters have alternative exit paths, it's possible to skip the onexit button
-    if(!encounteroptions.onexit || typeof encounteroptions.onexit == "undefined"){
-        // Remove the exit button if the encounter doesn't supply an onexit
-        eventBox.querySelector("#eventexit").remove();
-    }
-    else{
+    if(encounteroptions.exitbutton !== false){
         // Otherwise, attach the exit callback
         eventBox.querySelector("#eventexit").onclick = encounteroptions.onexit;
     }

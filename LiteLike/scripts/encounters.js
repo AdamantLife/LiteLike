@@ -78,6 +78,8 @@ export class EncounterSequence{
      * @param {(Encounter|EncounterSequence)[]} encounters - A list of the encounter objects to progress through
      */
     constructor(encounters){
+        // If not provided, encounters default to an array;
+        if(!encounters || typeof encounters == "undefined") encounters = [];
         this.encounters = Array.from(encounters);
         // Initializing with negative index so that EncounterSequence.increment
         // can always be called
@@ -123,7 +125,7 @@ export class EncounterSequence{
             result = result.increment();
 
             // Return the subsequence's result if it has one
-            if(result) return result;
+            if(result && typeof result !== "undefined") return result;
 
             // If it doesn't have one, we'll increment our index like normal
         }
@@ -136,6 +138,8 @@ export class EncounterSequence{
         // If the new result is a subsequence, return that subsequence's next increment
         if(result.constructor.name == "EncounterSequence") return result.increment();
 
+        // TODO: May have to recurse again if empty Sub Sequence is supplied
+
         // Otherwise, we'll return the the Encounter at the new index
         return result;
     }
@@ -143,8 +147,11 @@ export class EncounterSequence{
      * Adds an encounter to the EncounterSequence
      * @param {Encounter | EncounterSequence} encounter - The encounter to add
      */
-    addEncounter(encounter){
-        this.encounters.push(encounter);
+    addEncounter(...encounters){
+        // Need to note initial state; see note below
+        let index= this.index, length = this.encounters.length;
+
+        for(let encounter of encounters) this.encounters.push(encounter);
 
         /**
          * NOTE- this condition arises because we previously tried to increment past
@@ -164,7 +171,7 @@ export class EncounterSequence{
          * GUI without first calling EncounterSequence.increment to move to the added
          * Encounter
          */
-        if(this.index >= this.encounters.length) this.index = this.encounters.length - 1;
+        if(index > length) this.index = length -1;
     }
 
     /**
@@ -180,8 +187,10 @@ export class Encounter{
     /**
      * Creates a new encounter
      * @param {Symbol} type - an encountertype enumeration
+     * @property {Game} game - The GAME object
      * @param {Reward[]} reward -  An array of rewards
      * @param {Object} options - Specifications of the encounter; depends on encountertype
+     * 
      * @param {String} options.exitbutton - The text to display on the exit button
      * @param {Function} options.onexit - Callback to attach to the exit button
      */
@@ -339,6 +348,7 @@ export class MessageEncounter extends Encounter{
  * @param {Function} options.rewardexit - Overrides the onexit for the generated RewardEncounter
  * @param {Function} options.messageexit - Overrides the onexit for the generated MessageEncounter (if that encounter is created)
  * @param {Number} [options.tier=1] - If this is a random encounter and/or has random rewards, this will override the tier
+ * @returns {EncounterSequence} - Returns the full combat sequence
  */
 export function buildCombatEncounter(game, enemy, rewards, onexit, options){
     if(!options || typeof options == "undefined") options = {};

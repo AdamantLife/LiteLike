@@ -7,6 +7,9 @@ import pathlib
 class Session:
     number: int
     segments: list["Segment"] = dataclasses.field(default_factory=list)
+
+    def sum(self):
+        return sum((segment.duration for segment in self.segments), start=datetime.timedelta())
     
 @dataclasses.dataclass
 class Segment:
@@ -17,7 +20,7 @@ class Segment:
     def duration(self):
         return self.end - self.start
 
-SERE = re.compile("^#+?\s*Session\s*(?<sessionnumber>\d+)")
+SERE = re.compile("^#+?\s*Session\s*(?P<sessionnumber>\d+)")
 DTRE = re.compile("^\s*\*\s*(?P<datetime>(?P<date>(?P<month>\d+)-(?P<day>\d+)-(?P<year>\d+))\s+(?P<time>(?P<hour>\d+):(?P<minute>\d+)\s*(?P<apm>am|pm)))-\s*(?P<type>[Ss]tart|[Ee]nd)\s*$")
 
 def parse(file: str = None):
@@ -51,3 +54,17 @@ def parse(file: str = None):
                     if sessions[-1].segments[-1].end:
                         raise RuntimeError(f"Parsed a duplicate Segment End prior to: {line}")
                     sessions[-1].segments[-1].end = dt
+
+    from pprint import pprint
+    for session in sessions:
+        print(f"Session {session.number}")
+        print(f">>> {session.sum()}")
+
+    print("Total Time:")
+    delta:datetime.timedelta = sum((session.sum() for session in sessions), start=datetime.timedelta)
+    hours = delta.total_seconds() / 60 / 60
+    print(f"    {hours}")
+
+if __name__ == "__main__":
+    path = (pathlib.Path(__file__).parent / "README.md").resolve()
+    parse(path)

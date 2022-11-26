@@ -7,6 +7,14 @@
         {
             "name": "Space Brigand",
             "flavor": "Just like the terrestial type, just IN SPACE!!!"
+        },
+        {
+            "name": "Magna Populator",
+            "flavor": "It's just a  big cat... A REALLY BIG cat..."
+        },
+        {
+            "name": "Magna Ultima Populator",
+            "flavor": "It's just a big... Actualy, no, this no longer just a big cat."
         }
     ],
     "weapon":[
@@ -21,6 +29,18 @@
         {
             "name": "Laser Pistol",
             "flavor": "This handy little sidearm focuses the rage of a thousand suns into an itty bitty laser beam."
+        },
+        {
+            "name": "Energy Sword",
+            "flavor": "While it's still iconic, this version does not one-shot the enemy. Most of the time."
+        },        
+        {
+            "name": "Razor Claws",
+            "flavor": "Nature's daggers: shaped by millenia and honed by the wild."
+        },
+        {
+            "name": "Saber Fangs",
+            "flavor": "Monstrous incisors with the potential to pry your tin can open."
         }
     ],
     "armor":[
@@ -31,6 +51,10 @@
         {
             "name": "Bararium Armor",
             "flavor": "Armor from a special alloy that raises the Bar on protection"
+        },
+        {
+            "name": "Thick Fur",
+            "flavor": "The creature is covered in thick fur. Which is less impressive since you're in a mech, but- hey- that's what evolution gave it."
         }
     ],
     "item":[
@@ -59,6 +83,14 @@
         {
             "name": "Kinetic Slugs",
             "flavor": "Solid metal chunks of bad intentions"
+        },
+        {
+            "name":"Geolocating Marker",
+            "flavor": "A nifty little device that can maintain a connection between mech and transport no matter the planet's magnetic field strength or corrosivity of its atmosphere. A must-have for every Wanderer."
+        },
+        {
+            "name": "Enhanced Biomaterial",
+            "flavor": "The creature this material came from spent a long period in the vacinity of Auron Crystals, mutating its DNA causing it to be larger and smarter than others of its type."
         }
     ],
     "transport":[

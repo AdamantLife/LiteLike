@@ -28,6 +28,33 @@
             "shopCost":[],
             "ammunition":1,
             "weight":1
+        },
+        {
+            "damage": 3,
+            "cooldown":1000,
+            "warmup":1000,
+            "range": "MELEE",
+            "shopPrerequisites":[],
+            "shopCost":[],
+            "weight": 1
+        },
+        {
+            "damage": 1,
+            "cooldown":500,
+            "warmup": 500,
+            "range":"MELEE",
+            "shopPrerequisites":null,
+            "shopCost": null,
+            "weight": 0
+        },
+        {
+            "damage": 2,
+            "cooldown":2000,
+            "warmup": 500,
+            "range":"MELEE",
+            "shopPrerequisites": null,
+            "shopCost": null,
+            "weight": 0
         }
     ],
     "armor":[
@@ -40,6 +67,11 @@
             "value": 1,
             "shopPrerequisites": [],
             "shopCost":[]
+        },
+        {
+            "value":0,
+            "shopPrerequisites":null,
+            "shopCost":null
         }
     ],
     "item":[
@@ -79,6 +111,16 @@
             "weight": 1,
             "shopPrerequisites":[],
             "shopCost":[[2,10]]
+        },
+        {
+            "weight": 1,
+            "shopPrerequisites": [],
+            "shopCost": [[1,3],[2,3]]
+        },
+        {
+            "weight":1,
+            "shopPrerequisites":null,
+            "shopCost": null
         }
     ],
     "transport":[

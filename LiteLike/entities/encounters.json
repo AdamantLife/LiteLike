@@ -9,6 +9,26 @@
                 "armor":0,
                 "items":[],
                 "resources":[[4, 10]]
+            },
+            {
+                "name":2,
+                "hp":5,
+                "weapons":[
+                    4
+                ],
+                "armor":2,
+                "items": [],
+                "resources":[]
+            },
+            {
+                "name":2,
+                "hp":10,
+                "weapons":[
+                    4, 5
+                ],
+                "armor":2,
+                "items": [],
+                "resources":[]
             }
         ],
         "tiers":{

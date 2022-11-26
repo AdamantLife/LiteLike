@@ -62,7 +62,8 @@ export class Map extends UTILS.EventListener{
         "enterport", "leaveport",
         "enterdungeon", "leavedungeon",
         "enterstation", "leavestation",
-        "entercolony", "leavecolony"
+        "entercolony", "leavecolony",
+        "mapchange"
     );
 
     /**
@@ -255,13 +256,8 @@ export class Map extends UTILS.EventListener{
         // Copy the map
         let map = Array.from(this.map);
         
-        // Get the row the Player is on so we can add him
-        let row = map[this.playerLocation[1]];
-        
-        map[this.playerLocation[1]] =                   // Replace the row with
-            row.substring(0,this.playerLocation[0])     // The row up to the Player
-            + PLAYERSYMBOL                              // The Player Symbol
-            + row.substring(this.playerLocation[0]+1);  //  The rest of the the row
+        // Replace the symbol at this.playerLocation with the PLAYERSYMBOL
+        this.replaceSymbolAtLocation(map, this.playerLocation, PLAYERSYMBOL)
 
         // No mask, just return
         if(!mask || typeof mask === "undefined") return map;
@@ -314,4 +310,42 @@ export class Map extends UTILS.EventListener{
         // Return only the character at the given location x coord
         return row.slice(location[0],location[0]+1);
     }
+
+    /**
+     * Modifies the provided map array so that the provided replacement symbol is at the given map location
+     * @param {*} map - A map array
+     * @param {*} location - A length-2 array of integers that fall within the map
+     * @param {*} replacement - A character to place at the target location
+     * @returns {null} - This function modifies the object in place
+     */
+    replaceSymbolAtLocation(map, location, replacement){
+        // Get the row the location is on
+        let row = map[location[1]];
+        
+        map[location[1]] =                   // Replace the row with
+            row.substring(0,location[0])     // The row up to the location y coordinate
+            + replacement                    // the replacement symbol
+            + row.substring(location[0]+1);  // The rest of the the row
+    }
+
+    /**
+     * Replaces an Unexplored Port, Station, or Planet at the given locaion with a Port
+     * @param {Number[]} [location = this.playerLocation] - A length-2 array of integers that fall within the map
+     */
+    clearStructureAtLocation(location){
+        if(!location || typeof location == "undefined") location = this.playerLocation;
+        // Get symbol at location
+        let symbol = this.getSymbolAtLocation(location);
+        // Make sure it's a valid symbol
+        // If not, return (because we're not raising errors in this program)
+        if([UNEXPLOREDPORT, DUNGEONSYMBOL, STATIONSYMBOL].indexOf(symbol) < 0) return;
+
+        // Replace the UnexpoloredPort/Planet/Station with a Port Symbol
+        // Note that replaceSymbolAtLocation modifies the object inplace, so our map object
+        // is automatically "overwritten"
+        this.replaceSymbolAtLocation(this.map, location, PORTSYMBOL);
+        // Trigger event to let listeners know that there has been a change to our Map
+        this.triggerEvent(Map.EVENTTYPES.mapchange, {map: this.map, location});
+    }
+
 }

@@ -28,6 +28,21 @@ import * as GUI from "./site.js";
     return combatBox;
 }
 
+/**
+ * Removes all evnet listeners for combat from the provided game
+ * @param {Game} game - The GAME object
+ */
+ function cleanupCombat(game){
+    // Incase this is called accidently
+    if(!game.COMBAT || game.COMBAT == "undefined") return;
+    // Clear all listeners
+    game.COMBAT.removeAllListeners();
+    game.COMBAT.player.removeAllListeners();
+    game.COMBAT.enemy.removeAllListeners();
+    // Clear combat from Game
+    game.COMBAT = null;
+}
+
 
 /**
  * Clears the finished animation classes
@@ -228,7 +243,7 @@ export class CombatGui{
         let enemyBox = combatBox.querySelector(`div[data-combatant="enemy"]`);
 
         // Add listeners
-        this.combat.addEventListener("endcombat", this.encounteroptions.onexit);
+        this.combat.addEventListener("endcombat", this.cleanupCombat.bind(this));
         // GUI Updates
         this.combat.addEventListener("useweapon", this.updateInput.bind(this));
         this.combat.addEventListener("useitem", this.updateInput.bind(this));
@@ -263,6 +278,22 @@ export class CombatGui{
         document.getElementById("combat").removeEventListener("animationend", this.startCombat.bind(this));
         // Start Combatloop
         this.combat.combatLoop();
+    }
+
+    /**
+     * COMBAT GUI CLEANUP
+     * 
+     */
+
+    /**
+     * Removes all listeners and calls encounteroptions.onexit
+     * @param {CombatEvent} event - The endcombat event
+     */
+    cleanupCombat(event){
+        // Remove listeners
+        cleanupCombat(this.game);
+        // Call onexit
+        this.encounteroptions.onexit(this.combat);
     }
 
     /**
