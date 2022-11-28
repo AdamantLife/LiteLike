@@ -28,7 +28,9 @@ export class RewardsGui{
         // Add main, reward table, and close button
         eventBox.insertAdjacentHTML('beforeend', `<div class="eventsmain"><table><tbody id="rewardarea"></tbody</table></div><button id="eventexit">Close</button>`);
         // Attach exit callback
-        document.getElementById("eventexit").onclick = this.encounteroptions.onexit;
+        let onexit = this.game.cycleEncounter.bind(this.game);
+        if(this.encounteroptions.onexit && typeof this.encounteroptions.onexit !== "undefined") onexit = this.encounteroptions.onexit;
+        document.getElementById("eventexit").onclick = ()=>onexit();
         
         // Add rewards
         for(let reward of rewards){

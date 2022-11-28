@@ -55,15 +55,18 @@ def parse(file: str = None):
                         raise RuntimeError(f"Parsed a duplicate Segment End prior to: {line}")
                     sessions[-1].segments[-1].end = dt
 
-    from pprint import pprint
-    for session in sessions:
-        print(f"Session {session.number}")
-        print(f">>> {session.sum()}")
-
+    def sessiontohours(session: Session):
+        return session.sum().total_seconds() / 60 / 60
+    largest = max(sessions, key=lambda session: session.sum())
+    
+    
     print("Total Time:")
     delta:datetime.timedelta = sum((session.sum() for session in sessions), start=datetime.timedelta)
     hours = delta.total_seconds() / 60 / 60
     print(f"    {hours}")
+
+    print("\nLongest Session:")
+    print(f"    {largest.name}({sessiontohours(largest)})")
 
 if __name__ == "__main__":
     path = (pathlib.Path(__file__).parent / "README.md").resolve()

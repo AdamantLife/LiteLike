@@ -195,6 +195,29 @@ export class Character extends Entity{
         // Notify listeners that HP has changed
         this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP, initialHP, rawchange: value});
     }
+
+    /**
+     * Sets the Character's currentHP to the given amount (max the Character's hp stat) and notify listeners.
+     * If there is no change in HP, listeners will not be notified.
+     * @param {Number} value - The HP to set to
+     */
+    setHP(value){
+        // Track change
+        let initialHP = this.statistics.currentHP;
+        // Set to max of stat.hp
+        this.statistics.currentHP = Math.min(value, this.statistics.hp);
+        // if change did not occur, exit early
+        if(initialHP == this.statistics.currentHP) return;
+        // Otherwise, notify listeners
+        this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP, initialHP, setvalue: value});
+    }
+
+    /**
+     * Returns whether or not the Character's currentHP is less than or equal to 0
+     */
+     isKOd(){
+        return this.statistics.currentHP <= 0;
+    }
 }
 
 /**
@@ -252,7 +275,7 @@ export class PlayerCharacter extends Character{
      * Returns a new 
      */
     getCombatCharacter(){
-        return new CombatCharacter(this.id, this.roles, this.statistics, this.equipment);
+        return new CombatCharacter(this.id, this.roles, this.statistics, this.equipment, this);
     }
     
 
@@ -290,8 +313,11 @@ export class CombatCharacter extends Character{
      * @param {Item[]}   equipment.items - An Array of Item Objects owned by the character
      * @param {Resource[]} equipment.resources - An Array of Resource Objects owned by the character
      */
-    constructor(id, roles, statistics, equipment){
+    constructor(id, roles, statistics, equipment, character){
         super(id, roles);
+        // If this character was built off of another character (e.g.- The Player Character)
+        // save a backreference to it
+        this.character = character;
 
         this.statistics = statistics;
 
@@ -314,13 +340,6 @@ export class CombatCharacter extends Character{
         // If there are items in equipment, use that value
         if(equipment.hasOwnProperty("resources")) resources = equipment.resources;
         this.resources = resources;
-    }
-
-    /**
-     * Returns whether or not the Character's currentHP is less than or equal to 0
-     */
-    isKOd(){
-        return this.statistics.currentHP <= 0;
     }
 
     /**

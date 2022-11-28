@@ -129,7 +129,8 @@ export class EncounterSequence{
 
             // If it doesn't have one, we'll increment our index like normal
         }
-        this.index+=1;
+        // Cap the increment at one past the index of our last encounter
+        this.index= Math.min(this.index+1, this.encounters.length);
         result = this.encounters[this.index];
 
         // If no more Encounters just return
@@ -148,30 +149,15 @@ export class EncounterSequence{
      * @param {Encounter | EncounterSequence} encounter - The encounter to add
      */
     addEncounter(...encounters){
-        // Need to note initial state; see note below
-        let index= this.index, length = this.encounters.length;
-
-        for(let encounter of encounters) this.encounters.push(encounter);
-
+        this.encounters.push(...encounters);
         /**
-         * NOTE- this condition arises because we previously tried to increment past
-         *      the end of the encounters array.
-         * 
-         * When we add a new encounter, the expectations is that the encounter will be
-         * incremented to eventually, but that will not happen if we are already at/past
-         * its index
-         * 
-         * We don't want to undo failed increments, because then EncounterSequence.get
-         * will not return undefined  and it will look like we still have more Encounters
-         * to cycle through; this results in the last Encounter in a Sequence repeating
-         * indefinitely.
-         * 
-         * Resetting index to the Encounter previous to the added Encounter is a simple
-         * fix; it's unlikely that EncounterSequence.get will be called to populate the
-         * GUI without first calling EncounterSequence.increment to move to the added
-         * Encounter
+         *  DEVNOTE- Previously, we had to track the previous size of the encounter list for two reasons:
+         *      1) We allowed the index to grow infinitely past this.encounters.length
+         *      2) The execution pattern that we were expecting was to always call EncounterSequence.increment
+         *          prior to calling EncounterSequence.get().initEncounter()
+         *      We now cap the index at Sequence.length (so when an Encounter is added, it is already ready)
+         *          and now we don't necessarily enforce that increment is called first
          */
-        if(index > length) this.index = length -1;
     }
 
     /**
@@ -183,16 +169,87 @@ export class EncounterSequence{
     }
 }
 
+/**
+ * A special EncounterSequence which builds its own encounters and subsequences
+ * as they are required.
+ */
+export class DynamicSequence extends EncounterSequence{
+
+    /**
+     * Builder callbacks
+     * @callback builderFunc
+     * @param {DynamicSequence} dynamicSequence - a reference back to this so the builder
+     *          has access to any relevant resources it might need.
+     * @returns {EncounterSequence} - The callback should return an EncounterSequence
+     */
+
+
+    /**
+     * Initializes a new DynamicSequence
+     * @param {Game} game - The game object which will be used to notify when each encounter ends
+     * @param {Number} [maxFloor=5] - The last floor number (floors start at 0- which is typically a
+     *                                  benign introduction- so maxFloor is the n+1'th encounter)
+     * @param {builderFunc} builder - The function used to generate new floors, should accept 
+     */
+    constructor(game, maxFloor, builder){
+        // A DynamicSequence is not initialized with encounters
+        super();
+        this.game = game;
+        // Every DynamicSequence starts at floor 0
+        this.floor = 0;
+        // maxFloor defaults to 5
+        if(!maxFloor || typeof maxFloor == "undefined") maxFloor = 5;
+        this.maxFloor = maxFloor;
+        this.builder = builder;
+        // A flag to indicate to the DynamicSequence when to stop creating floors
+        this.quit = false;
+    }
+    /**
+     * The callback to generate a new floor of the DynamicSequence before the previous floor exits
+     * It generates a new Encounter and adds it to the EncounterSequence, then calls Game.cycleEncounter
+     * in order to laod the next (just added) EncounterSequence/FLoor
+     */
+     buildNextSegment(){
+        // The result of actions taken on the previous segment/floor prevents the Player from
+        // continuing futher into the DynamicSequence
+        if(this.quit === true ||
+        // Or we are past the maxfloor
+            this.floor > this.maxFloor){
+
+            // Set our current encounter to undefined so anyone
+            // watching sees that we are done
+            this.index = this.encounters.length;
+            // Setting this.quit for good measure
+            this.quit = true;
+
+            // Calling this.game.cycleEvent(true) will result in
+            // this sequence automatically being removed and all
+            // all relevant listeners being notified
+            this.game.cycleEncounter(true);
+            return;
+        }
+        // Each floor might have multiple scenes, so we receive an EncounterSequence back by default
+        let encounterSequence = this.builder(this);
+
+        // Update the floor for the next iteration
+        this.floor += 1;
+        // Add the new sequence
+        this.addEncounter(encounterSequence);
+
+        // Have the game add the next floor
+        this.game.cycleEncounter();
+    }
+
+}
+
 export class Encounter{
     /**
      * Creates a new encounter
      * @param {Symbol} type - an encountertype enumeration
-     * @property {Game} game - The GAME object
-     * @param {Reward[]} reward -  An array of rewards
      * @param {Object} options - Specifications of the encounter; depends on encountertype
      * 
      * @param {String} options.exitbutton - The text to display on the exit button
-     * @param {Function} options.onexit - Callback to attach to the exit button
+     * @param {Function} [options.onexit] - Alternative callback to attach to the exit button
      */
     constructor(type, options){
         // Make sure type is a valid encounter type
@@ -201,10 +258,33 @@ export class Encounter{
         this.type = type;
 
         this.options = {...options};
+
+        // If the Encounter creates another object to manage it, that object will be set here
+        // For example, CombatEncounters create a Combat instance
+        this.instance = null;
     }
 
+    get game(){ return this.options.game; }
+
+    /**
+     * Runs any additional setup required by the Encounter. Overwrite as necessary in subclasses
+     */
     initEncounter(){
-        return {game: this.options.game, exitbutton: this.options.exitbutton, onexit: this.options.onexit}
+        return;
+    }
+
+    /**
+     * The outward facing hook for initEncounter. Subclasses should overwrite
+     * initEncounter rather than this function.
+     */
+     initialize(){
+        this.initEncounter();
+        this.game.triggerEvent("encounterinitialized", {encounter: this});
+        return;
+    }
+
+    getOptions(){
+        return {game: this.options.game, exitbutton: this.options.exitbutton, onexit: this.options.onexit};
     }
 }
 
@@ -215,20 +295,20 @@ export class CombatEncounter extends Encounter{
      */
     constructor(options){
         super(encountertype.COMBAT, options);
-
-        // Initialized in initEncounter
-        this.combat;
     }
     /**
      * Initializes a new Combat instance using the supplied game and enemy.
-     * @returns {Combat}- The combat object which is also accessible via this.combat
+     * @returns {Combat}- The combat object which is also accessible via this.instance
      */
     initEncounter(){
-        let result = super.initEncounter()
-        this.combat = new Combat(this.options.game.PLAYER.getCombatCharacter(), this.options.enemy);
-        result.combat = this.combat;
-        return result;
+        this.instance = new Combat(this.options.game.PLAYER.getCombatCharacter(), this.options.enemy);
+        return this.instance;
     }
+    getOptions(){
+        let result = super.getOptions();
+        result.combat = this.instance;
+        return result;
+    }    
 }
 
 export class ChoiceEncounter extends Encounter{
@@ -243,8 +323,8 @@ export class ChoiceEncounter extends Encounter{
         super(encountertype.CHOICE, options);
     }
 
-    initEncounter(){
-        let result = super.initEncounter();
+    getOptions(){
+        let result = super.getOptions();
         // We'll need to initialize the cost for each choice
         let choices = [];
         for(let choice of this.options.choices){
@@ -284,8 +364,8 @@ export class RewardEncounter extends Encounter{
         super(encountertype.REWARD, options);
     }
 
-    initEncounter(){
-        let result = super.initEncounter();
+    getOptions(){
+        let result = super.getOptions();
         result.rewards = [];
         for(let r of this.options.rewards){
             result.rewards.push(parseReward(this.options.game, r));
@@ -306,8 +386,8 @@ export class MessageEncounter extends Encounter{
     constructor(options){
         super(encountertype.MESSAGE, options);
     }
-    initEncounter(){
-        let result = super.initEncounter();
+    getOptions(){
+        let result = super.getOptions();
         result.message = this.options.message;
         return result
     }
@@ -329,8 +409,8 @@ export class MessageEncounter extends Encounter{
         // initialize it with our own callback and have to add it later
         this.type = encountertype.CALLBACK
     }
-    initEncounter(){
-        let result = super.initEncounter();
+    getOptions(){
+        let result = super.getOptions();
         result.callback =  this.options.callback
         return result;
     }
@@ -341,7 +421,6 @@ export class MessageEncounter extends Encounter{
  * @param {Game} game - The game object to get statistics from
  * @param {Character | null} enemy - Enemy ID to fight. Null will produce a random tier 1 encounter
  * @param {ItemDescription[] | null} rewards - A list of rewards. Null will produce random tier 1 rewards
- * @param {onext} - The onexit encounter option to use
  * @param {Object} options - Additional options
  * @param {String} options.message - Creates a MessageEvent prior to the CombatEvent
  * @param {Function} options.combatexit - Overrides the onexit for the generated CombatEncounter
@@ -350,7 +429,7 @@ export class MessageEncounter extends Encounter{
  * @param {Number} [options.tier=1] - If this is a random encounter and/or has random rewards, this will override the tier
  * @returns {EncounterSequence} - Returns the full combat sequence
  */
-export function buildCombatEncounter(game, enemy, rewards, onexit, options){
+export function buildCombatEncounter(game, enemy, rewards, options){
     if(!options || typeof options == "undefined") options = {};
     // Establish teir preemptively (this may not be a random encounter)
     // If tier is in options, then use it, otherwise default to 1
@@ -370,6 +449,8 @@ export function buildCombatEncounter(game, enemy, rewards, onexit, options){
         if(result) rewardobjs.push(result);
     }
 
+    // The default for cycling Encounters is game.cycleEncounter
+    let onexit = game.cycleEncounter.bind(game);
     // Check for overriden onexit for Combat
     let combatexit = onexit;
     if(options.combatexit && typeof options.combatexit !== "undefined") combatexit = options.combatexit;
@@ -380,7 +461,7 @@ export function buildCombatEncounter(game, enemy, rewards, onexit, options){
     let combat = new CombatEncounter({game, enemy, onexit: combatexit});
     let reward = new RewardEncounter({game, rewards: rewardobjs, onexit: rewardexit});
 
-    let encounterlist = [combat, reward];
+    let sequence = new EncounterSequence()
 
     if(options.message && typeof options.message !== "undefined"){
         // Check for overriden onexit for Message
@@ -389,11 +470,14 @@ export function buildCombatEncounter(game, enemy, rewards, onexit, options){
 
         let message = new MessageEncounter({game, message: options.message, onexit: messageexit});
         
-        // Insert MessageEncounter at the front of the list
-        encounterlist.splice(0,0,message);
+        // Start with the message encounter
+        sequence.addEncounter(message);
     }
 
-    return new EncounterSequence(encounterlist);
+    // Add the combat and reward encounters
+    sequence.addEncounter(combat, reward);
+
+    return sequence;
 }
 
 /**

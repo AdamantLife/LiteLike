@@ -99,7 +99,9 @@ export class Combat extends UTILS.EventListener{
         this.triggerEvent(Combat.EVENTTYPES.startloop);
 
         // Player has lost, so end combat
-        if(this.victor == this.enemy) return this.resolveCombat();
+        // We added the lockout here because we were somehow triggering multiple
+        // resolveCombats
+        if(this.victor == this.enemy && !this.lockout) return this.playerKO();
 
         // Player has won and lockout time is over
         if(this.victor == this.player & this.lockout <= UTILS.now()) return this.resolveCombat();
@@ -291,6 +293,16 @@ export class Combat extends UTILS.EventListener{
         return false;
     }
 
+    /**
+     * It turns out we were somehow triggering resolveCombat multiple times
+     *  so we needed to set the lockout to keep that from happening
+     */
+    playerKO(){
+        
+        if(this.lockout) return;
+        this.lockout = true;
+        this.resolveCombat();
+    }
     /**
      * Cleans up combat
      */

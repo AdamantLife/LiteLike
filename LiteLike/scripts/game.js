@@ -7,14 +7,27 @@ import { Encounter, EncounterSequence } from "./encounters.js";
 
 import * as IO from "./io.js";
 import * as EQUIP from "./items.js";
+import * as UTILS from "./utils.js";
 
 
-export class Game{
+export class Game extends UTILS.EventListener{
+    static EVENTTYPES = UTILS.enumerate(
+        "encountersequenceadded", "encountersequenceremoved",
+        "encounterstart", "encounterend",
+        // This is implemented for the edge case in which listeners need
+        // to be notified that the current EncounterSequence is no longer
+        // active, but has not been formally removed from the Game
+        "noencounter",
+        // The encounter has completed initialization after being started
+        "encounterinitialized"
+        // TODO: ? Maybe add Player/Colony Added events?
+    );
     /**
      * Create a new Game instance
      * @param {Object} state - A State Object for seedrandom
      */
     constructor(state){
+        super(Game.EVENTTYPES);
         // If state is provided for the RNG, use it
         if(typeof state !== "undefined"){
             this.random = new Math.seedrandom("", {state});
@@ -64,9 +77,6 @@ export class Game{
 
         // Current ENCOUNTER
         this.ENCOUNTER = null;
-
-        // Current Combat being executed (if any)
-        this.COMBAT = null;
     }
 
     /**
@@ -99,16 +109,71 @@ export class Game{
      * Checks if the Game is currently in an EncounterSequence.
      * If it is, adds the Encounter to the end of the Sequence.
      * Otherwise, creates a new EncounterSequence with the given Encounter
+     * and sets it via this.setEncounter
      * @param {Encounter} encounter - The encounter to add
      * @returns {EncounterSequence} - The Game's current EncounterSequence
      */
     getOrAddEncounter(encounter){
         if(!this.ENCOUNTER){
-            this.ENCOUNTER = new EncounterSequence([encounter,]);
+            let sequence = new EncounterSequence([encounter,]);
+            this.setEncounter(sequence);
         }else{
             this.ENCOUNTER.addEncounter(encounter)
         }
-        return this.ENCOUNTER
+        return this.ENCOUNTER;
+    }
+
+
+    /**
+     * Sets the given encounterSequence as this.ENCOUNTER and triggers the encountersequenceadded callback
+     * @param {EncounterSequence} encounterSequence - The EncounterSequence to add
+     */
+    setEncounter(encounterSequence){
+        this.ENCOUNTER = encounterSequence;
+        this.triggerEvent(Game.EVENTTYPES.encountersequenceadded, {sequence: this.ENCOUNTER});
+    }
+
+    /**
+     * Clears the current EncounterSequence and notifies listeners
+     */
+    clearEncounter(){
+        // There is no encounter, so ignore
+        if(!this.ENCOUNTER) return;
+        // Keep a record of the sequence so we can provide it to the callback
+        let sequence = this.ENCOUNTER;
+        // Clear our current Sequence
+        this.ENCOUNTER = null;
+        // Notify listeners
+        this.triggerEvent(Game.EVENTTYPES.encountersequenceremoved, {sequence});
+    }
+
+    /**
+     * Increments the current EncounterSequence
+     * If the sequence has a new Encounter, encounterstart will be triggered
+     * Othwerise, if autoRemove it true, this.ENCOUNTERS will be cleared and
+     *      encountersequenceremoved will be triggered
+     * If autoRemove is false (and no new Encounter), then the noencounter Event will be triggered
+     * @param {Boolean} [autoRemove = false] - Whether or not to remove an
+     *          EncounterSequence if it does not have any more Encounters. Defaults to false.
+     */
+    cycleEncounter(autoRemove = false){
+        if(!this.ENCOUNTER) return;
+        // Notify listeners that we are ending/clearing the current Encounter
+        this.triggerEvent(Game.EVENTTYPES.encounterend, {sequence: this.ENCOUNTER, encounter: this.ENCOUNTER.get()});
+
+        let encounter = this.ENCOUNTER.increment();
+        // There is a new encounter afterthe increment, so notify listeners that it has been loaded
+        if(encounter){
+            this.triggerEvent(Game.EVENTTYPES.encounterstart, {sequence: this.ENCOUNTER, encounter});
+        // We have reached the end of the Sequence and autoRemove is true, so notify listeners
+        // that we are clearing the EncounterSequence
+        }else if(autoRemove){
+            this.ENCOUNTER = null;
+            this.triggerEvent(Game.EVENTTYPES.encountersequenceremoved, {sequence: this.ENCOUNTER});
+        // End of the Sequence but we are not clearing the Sequence, so let listeners know
+        }else{
+            this.triggerEvent(Game.EVENTTYPES.noencounter, {sequence: this.ENCOUNTER});
+        }
     }
 }
 

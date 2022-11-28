@@ -21,7 +21,7 @@
                 "resources":[]
             },
             {
-                "name":2,
+                "name":3,
                 "hp":10,
                 "weapons":[
                     4, 5
@@ -31,12 +31,14 @@
                 "resources":[]
             }
         ],
-        "tiers":{
-            "combatants":[
+        "tiers":[
+            {
+                "combatants":[
 
-            ],
-            "rewards":[
-                
-            ]
-        }
+                ],
+                "rewards":[
+                    
+                ]
+            }
+        ]
 }

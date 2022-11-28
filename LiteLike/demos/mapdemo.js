@@ -130,48 +130,23 @@ export function mapDemo(){
      * 
      */
     function collectFromCache(){
-        let cacheSequence = MAPENCOUNTERS.visitPort(cycleEvent);
+        let cacheSequence = MAPENCOUNTERS.visitPort();
 
-        // Add the MessageEncounter to the GAME, getting back the current sequence
-        let sequence = GAME.getOrAddEncounter(cacheSequence);
-        
-        // If this is a new EncounterSequence, use cycle event to initialize it
-        if (sequence.index == -1) cycleEvent();
+        // Add the MessageEncounter to the GAME
+        // If this creates a new EncounterSequence, our listener below will
+        // recieve that event and automatically cycle to initalize the Encounter
+        GAME.getOrAddEncounter(cacheSequence);
     }
 
     /**
      * When the player enters the colony we unload all his resources
      */
     function visitColony(){
-        let encounter = MAPENCOUNTERS.visitColony(cycleEvent);
+        let encounter = MAPENCOUNTERS.visitColony();
         // Add the Encounter to the GAME
-        let sequence = GAME.getOrAddEncounter(encounter);
-        
-        // If this is a new EncounterSequence, use cycle event to initialize it
-        if (sequence.index == -1) cycleEvent();
-    }
-
-    /**
-     * Checks for Player KO and then cycles to the next event
-     * 
-     */
-    function finishCombat(combat){
-        // Player lost
-        if(combat.victor != combat.player){
-            // Just call gameOver
-            return gameOver("Game Over! You were slain in combat!")
-        }
-
-        // Cycle to next event
-        cycleEvent()
-    }
-
-    /**
-     * Updates travel resources, clears the eventbox and hides it
-     */
-    function cleanupEncounter(){
-        // Make sure map is up-to-date
-        updateTravelResources();
+        // If this creates a new EncounterSequence, our listener below will
+        // recieve that event and automatically cycle to initalize the Encounter
+        GAME.getOrAddEncounter(encounter);
     }
 
     /**
@@ -179,19 +154,17 @@ export function mapDemo(){
      * @param {MapEvent} event - The enterunexplored Map event
      */
     function portEvent(event){
-        // Call finishCombat to check if player is dead and to load the next event
-        // Then clear the portEvent from the Map
-        let callback = (combat)=>{finishCombat(combat); GAME.MAP.clearStructureAtLocation();}
         // Get Combat EncounterSequence
-        let encounterSequence = MAPENCOUNTERS.getBanditEncounter(callback, cycleEvent);
+        let encounterSequence = MAPENCOUNTERS.getBanditEncounter();
 
         // Initialize the encounter on the GAME
+        // This will trigger the encountersequenceadded event which we listen for below
+        // When we get the event we'll automatically cycleEncounter to move to load the
+        // first Encounter in the Sequence
+
         // NOTE: There should be no other possible events that arise simultaneous
         //          to the enterunexplored event, so we are not calling GAME.getOrAddEncounter
-        GAME.ENCOUNTER = encounterSequence
-
-        // Initialize the Sequence
-        cycleEvent();
+        GAME.setEncounter(encounterSequence);
     }
 
     /**
@@ -214,95 +187,76 @@ export function mapDemo(){
         // Recording the eventtype here so we don't have to dig for it each time
         let eventtype = event.eventtype == MAP.Map.EVENTTYPES.enterstation ? "station" : "dungeon";
 
-        /**
-         * The callback for each each encounter (instead of cycleEvent)
-         * It generates a new Encounter and adds it to the EncounterSequence
-         * @param {ENCOUNTERS.EncounterSequence} sequence - this Station/Dungeon's Encounter Sequence
-         * @param {Boolean} quit - If quit is true, the station/dungeon will be exited immediately and will not count as cleared
-         */
-        function buildNextSegment(sequence, quit){
-            // The result of actions taken on the previous segment/floor prevents the Player from
-            // continuing futher into the Station/Dungeon
-            if(quit === true ||
-            // Or we are past the maxfloor
-                floor > maxFloor){
-
-                // Make sure everything is cleaned up
-                ENCOUNTERSGUI.updateSequenceGUI(null, cleanupEncounter);
-                GAME.ENCOUNTER = null;
-                // and exit
-                return;
-            }
-            // Each floor might have multiple scenes, so we receive an EncounterSequence back
-            // by default
-            let encounterSequence;
-
-            // On exit is a recursion back to this function
-            // The exiting Segment/Floor can set quit to true in order to exit
-            // the dungeon/station Event immediately
-            let onexit = (quit)=>buildNextSegment(sequence, quit);
-
-            // Delegate to the individual floor builders
-            if (eventtype == "station"){
-                encounterSequence = MAPENCOUNTERS.buildStation(floor, maxFloor, onexit);
-            }
-            // eventtype == "dungeon"
-            else {
-                encounterSequence = MAPENCOUNTERS.buildDungeon(floor, maxFloor, onexit);
-            }            
-            
-            // Update the floor for the next iteration
-            floor += 1;
-            // Add the new sequence
-            sequence.addEncounter(encounterSequence);
-            // Increment the Sequence's index
-            sequence.increment();
-            // Update the GUI to load the encounter
-            ENCOUNTERSGUI.updateSequenceGUI(sequence, cleanupEncounter);
+        let builder;
+        // Delegate to the individual floor builders
+        if (eventtype == "station"){
+            builder = MAPENCOUNTERS.buildStation;
+        }
+        // eventtype == "dungeon"
+        else {
+            builder = MAPENCOUNTERS.buildDungeon;
         }
 
-        // Start an empty Seqeunce
-        GAME.ENCOUNTER = new ENCOUNTERS.EncounterSequence([]);
+        // Start an new DynamicSequence
+        // Use the default of 5 maxFloor (undefined)
+        GAME.ENCOUNTER = new ENCOUNTERS.DynamicSequence(GAME, undefined, builder)
+
         // Build the first Segement
         // buildNextSegment will recurse after this point
-        buildNextSegment(GAME.ENCOUNTER);
+        GAME.ENCOUNTER.buildNextSegment();
     }
 
-    
-
     /**
-     * Initializes the next Encounter from GAME.ENCOUNTER (delegates to updateSequenceGUI)
-     * NOTE: In most cases all we want to do between Encounters is increment the Sequence, but
-     *          for the exceptions we updateSequenceGUI to be separate from Sequence.increment()
+     * On PLAYER.currentHPchange and GAME.encounterend, check if player is ko'd and end demo if it is
      */
-    function cycleEvent(){
-        // Increment the EncounterSequence
-        GAME.ENCOUNTER.increment();
-        // And then load the next encounter
-        let [encounter, encounteroptions] = ENCOUNTERSGUI.updateSequenceGUI(GAME.ENCOUNTER, cleanupEncounter);
-
-        // If our current EncounterSequence is done, remove the Sequence from GAME
-        if(!encounter) GAME.ENCOUNTER = null;
+    function checkKO(event){
+        // It doesn't matter what event it is, we're just checking if the player is ko'd
+        if(GAME.PLAYER.isKOd()) gameOver("Game Over! You have run out of HP!");
     }
 
     // Register callbacks
     document.addEventListener("keyup", handleKeyPress);
     GAME.MAP.addEventListener("move", reloadMap);
 
+    /** Updates the UI to show changes at the top of the Screen */
+    // Potential change to RepairBots (Player.items[0])
     GAME.PLAYER.addEventListener("itemschange", updateTravelResources);
+    // Potential change to Transport.ReactorPower
     GAME.PLAYER.addEventListener("equipmentchange", updateTravelResources);
-
+    // A change to the Player's HP
+    GAME.PLAYER.addEventListener("currentHPchange", updateTravelResources);
     // The map has changed (i.e.- A location has been cleared)
     // DEVNOTE- If a location is cleared because the Player cleared it,
     //      this won't do anything because the Player's Symbol will be
     //      obscuring the location
     GAME.MAP.addEventListener("mapchange", reloadMap);
+    
+    /** GUI<->Event Management Listeners */
+    // A new EncounterSequence has been added, we will automatically load the first encounter in it
+    GAME.addEventListener("encountersequenceadded", (event)=> GAME.cycleEncounter());
+    /**  The current Encounter in the Game's current EncounterSequence has changed */
+    // We automatically initialize all encounters when they are started
+    GAME.addEventListener("encounterstart", (event)=>event.encounter.initialize());
+    // Once the encounter is done being initialized, we can load it into the GUI
+    GAME.addEventListener("encounterinitialized", (event)=>ENCOUNTERSGUI.updateSequenceGUI(event.encounter));
+    // Need to update the UI when there is no Encounter to display
+    GAME.addEventListener("encountersequenceremoved", (event)=>ENCOUNTERSGUI.updateSequenceGUI(null));
+    // Some sequences automatically call cycleEncounter which defaults to autoRemove=false
+    // In these cases, noencounter is raised. There is nothing in the demo that would use this functionality
+    // so we're just going to manually clear the encounter
+    GAME.addEventListener("noencounter", (event)=>GAME.clearEncounter());
 
+    /** Specific Map Events */
     // The player dumps all his collected resources at The Colony
     GAME.MAP.addEventListener("entercolony", visitColony);
     // At ports and The Colony the player's fuel is topped off and he can collect repair bots
     GAME.MAP.addEventListener("entercolony", collectFromCache);
     GAME.MAP.addEventListener("enterport", collectFromCache);
+    // UnexploredPorts convert to ports when they are exited
+    // NOTE- Currently the only way to exit an unexplored port is to defeat the enemy which should
+    //  also be the prerequisite for converting it; if it's possible to flee combat in the future,
+    //  then this should be removed and another method should be used
+    GAME.MAP.addEventListener("leaveunexplored", (event)=>GAME.MAP.clearStructureAtLocation());
 
     // Unexplored ports spawn a Combat Event
     GAME.MAP.addEventListener("enterunexplored", portEvent);
@@ -311,6 +265,14 @@ export function mapDemo(){
     GAME.MAP.addEventListener("enterdungeon", dungeonStationEvent);
     // Entering a Station
     GAME.MAP.addEventListener("enterstation", dungeonStationEvent);
+
+    /** Others */
+    // Checks for Player KO
+    GAME.PLAYER.addEventListener("currentHPchange", checkKO);
+    // In combat, the Player uses a CombatCharacter class to represent itself
+    // and therefore changes to its HP are not reflected, so we need to check
+    // if he died after each encounter ends
+    GAME.addEventListener("encounterend", checkKO);
 
     function gameOver(message){
         window.alert(message);
@@ -326,19 +288,22 @@ export function mapDemo(){
         document.removeEventListener("keyup", handleKeyPress);
         document.querySelectorAll("#combat button").forEach(button=>button.disabled=true);
 
+        // Remove all listeners for Game
+        GAME.removeAllListeners();
         // Remove listeners for Player
         GAME.PLAYER.removeAllListeners();
         // Cleanup Combat if it's there
-        if(GAME.COMBAT){
+        let encounter = GAME.ENCOUNTER ? GAME.ENCOUNTER.get() : null;
+        // encounter.instance will be null if the Encounter has not been initialized
+        if(encounter && encounter.instance && encounter.constructor.name == "CombatEncounter"){
+            let combat = encounter.instance;
             // Remove listeners
-            GAME.COMBAT.removeAllListeners();
-            GAME.COMBAT.player.removeAllListeners();
-            GAME.COMBAT.enemy.removeAllListeners();
+            combat.removeAllListeners();
+            combat.player.removeAllListeners();
+            combat.enemy.removeAllListeners();
             // Set victor to make sure that combatloop ends
-            GAME.COMBAT.victor = GAME.COMBAT.enemy;
+            combat.victor = combat.enemy;
         }
-        // Make sure GAME.COMBAT is cleared
-        GAME.COMBAT = null;
     }
 
     // Enable Map Movement

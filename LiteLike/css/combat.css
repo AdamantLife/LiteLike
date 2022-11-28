@@ -125,10 +125,10 @@ table[data-loadout] tr{
 
     @keyframes enemyswing {
         from{
-            left: 90%;
+            right: 0%;
         }
         to{
-            left: 50%;
+            right: 50%;
         }
     }
 #combat>.character>.projectile{
