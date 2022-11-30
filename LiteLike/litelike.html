@@ -2,22 +2,38 @@
 <html>
     <head>
         <style>
-            #menu>* {
+            .menu{
+                align-content: center;
+                text-align: center;
+                
+            }
+            .menu>* {
                 display:block;
+                margin-bottom: 1em;
             }
         </style>
         <link rel="stylesheet" href="css/site.css"/>
         <link rel="stylesheet" href="css/combat.css"/>
     </head>
     <body>
-        <div id="menu"></div>
+        <div id="menu" class="menu">
+            <div id="mainmenu" class="menu">
+                <button id="playbutton">Play</button>
+            </div>
+        </div>
         
         <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
         <script type="module" src="scripts/gui/combat.js"></script>
         <script type="module" src="demos/demos.js"></script>
         <script type="module" src="scripts/game.js"></script>
         <script>
+            let menu = document.getElementById("menu");
+            function traverseMenu(target){
+                for(let child of menu.children) child.style.display="none";
+                document.getElementById(target).style.display = "block";
+            }
             window.onload = ()=>{
+
             }
         </script>
     </body>

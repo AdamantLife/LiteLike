@@ -17,6 +17,9 @@ export function mapDemo(){
     toggleAllButtons(true);
     clearDemoBox();
 
+    // Keeps a record of ports cleared
+    let PORTSVISITED = [];
+
     // Player needs to be initialized for traveling the Map
     GAME.PLAYER = GAME.startingCharacter();
     // Give Player more Repair Bots to work with
@@ -25,13 +28,14 @@ export function mapDemo(){
     GAME.PLAYER.equipment.weapons.push(new EQUIP.Weapon(GAME.ITEMS.weapons[2]))
     // Give Player Batteries for Laser Pistol
     GAME.PLAYER.equipment.resources[1] = new EQUIP.Resource(GAME.ITEMS.resources[1], 5);
-    // Give Player a better Transport for the Demo
-    GAME.PLAYER.equipment.transport = GAME.ITEMS.transports[1];
-    GAME.PLAYER.equipment.transport.topOff();
 
 
     // Initialize a new Map and set the Map maunally
-    GAME.MAP = GAME.newMap()
+    // Null will produce a random seed
+    // true will generate a new Fog of War Mask
+    GAME.MAP = GAME.newMap(null, true);
+    // Update the map's fog-of-war for the Player's vision 
+    GAME.MAP.setVision(GAME.MAP.mask, GAME.MAP.playerLocation, GAME.PLAYER.statistics.vision);
     GAME.MAP.map = DEMOMAP.split("\n");
 
 
@@ -85,7 +89,11 @@ export function mapDemo(){
      * Reloads the map onto the page
      */
     function reloadMap(){
-        mapBox.innerHTML = GAME.MAP.getMap().join("<br>");
+        let replacements = [];
+        // Replace each location (visited port) with an empty cell (".")
+        for(let location of PORTSVISITED) replacements.push([location, "."]);
+        // We have to wrap the text in Pre in order to preserve the whitespace
+        mapBox.innerHTML = `<pre>${GAME.MAP.getMap({replacements}).join("<br>")}</pre>`;
     }
 
     // Populate the map
@@ -128,14 +136,26 @@ export function mapDemo(){
      * When the player enters the colony or a port, we refill his
      * reactorPower and give him a reward screen with 5 repair bots
      * 
+     * @param {MapEvent} event - Either the enterport/colony Map Event
      */
-    function collectFromCache(){
+    function collectFromCache(event){
         let cacheSequence = MAPENCOUNTERS.visitPort();
 
         // Add the MessageEncounter to the GAME
         // If this creates a new EncounterSequence, our listener below will
         // recieve that event and automatically cycle to initalize the Encounter
         GAME.getOrAddEncounter(cacheSequence);
+    }
+
+    /**
+     * The player can only collect a resource cache from each Port once:
+     * when he does we make a note of it here
+     * @param {*} event 
+     */
+    function clearPort(event){
+        // Record that the port has been visited
+        // We are using destination because this is the *enter* event
+        PORTSVISITED.push(event.destination);
     }
 
     /**
@@ -252,6 +272,8 @@ export function mapDemo(){
     // At ports and The Colony the player's fuel is topped off and he can collect repair bots
     GAME.MAP.addEventListener("entercolony", collectFromCache);
     GAME.MAP.addEventListener("enterport", collectFromCache);
+    // After the player has collected from the Cache, clear the port so it can't be revisited
+    GAME.MAP.addEventListener("enterport", clearPort);
     // UnexploredPorts convert to ports when they are exited
     // NOTE- Currently the only way to exit an unexplored port is to defeat the enemy which should
     //  also be the prerequisite for converting it; if it's possible to flee combat in the future,

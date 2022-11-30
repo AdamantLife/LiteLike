@@ -69,12 +69,23 @@ export class Map extends UTILS.EventListener{
     /**
      * 
      * @param {String | null} seed - Random Seed for the map (if not provided, one will be created
-     * @param {String} mask - String representing the revealed map
+     * @param {Number[][] | true} mask - An array of Strings representing the revealed map. If true,
+     *      generate a new mask which is filled with 0's
      * @param {Character} player - The Player Character
      */
     constructor(seed, mask, player){
         super(Map.EVENTTYPES);
         this.seed = seed;
+        // If mask is true, generate a new, empty (all 0's) mask
+        if(mask === true){
+            let row;
+            mask = [];
+            for(let y = 0; y < MAPSIZE; y++){
+                row = [];
+                for(let x = 0; x < MAPSIZE; x++) row.push(0);
+                mask.push(row);
+            }
+        }
         this.mask = mask;
         this.map = null;
         this.player = player;
@@ -207,7 +218,7 @@ export class Map extends UTILS.EventListener{
                     eventtype = Map.EVENTTYPES.leavedungeon;
                     break;
             }
-            if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: Map.playerLocation, destination});
+            if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: this.playerLocation, destination});
 
             eventtype = null;
             // Into a special location
@@ -229,12 +240,17 @@ export class Map extends UTILS.EventListener{
                     break;
             }
             
-            if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: Map.playerLocation, destination});
+            if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: this.playerLocation, destination});
 
             // Update player's location
             this.playerLocation = destination;
+
+            // Update Fog-of-War
+            this.setVision(this.mask, this.playerLocation, this.player.statistics.vision);
+
             // Notify that player has moved
-            this.triggerEvent(Map.EVENTTYPES.move, {direction, playerLocation: this.playerLocation});
+            let result = this.triggerEvent(Map.EVENTTYPES.move, {direction, playerLocation: this.playerLocation});
+                
             return [direction, true];
         }
         // We return without doing anything if we moved off the map (return null;)
@@ -247,19 +263,29 @@ export class Map extends UTILS.EventListener{
      * If mask is provided, it should map 1-for-1 onto the Map and will be used Booleaned with each coordinate on the
      * map. If the mask is 1, then the character at the given coordinate will be displayed; otherwise, that coordinate
      * will be converted to a space.
-     * @param {Number[] | null} mask - A series of Zeroes and non-Zeroes which will be mapped onto the map string
+     * @param {Object} options - Options for formatting the mask
+     * @param {Number[] | null} options.mask - A series of Zeroes and non-Zeroes which will be mapped onto the map string
+     * @param {Array[Location, String]} options.replacements - Symbol replacements to make on the map. The first element is the
+     *          Location is where to do the replacements, the second is what to use as the replacement
      * @returns {String[]} - The map
      */
-    getMap(mask){
-        if(typeof mask === "undefined") mask = this.mask;
-
+    getMap(options){
         // Copy the map
         let map = Array.from(this.map);
+
+        // Do replacements, if any
+        if(options.replacements && typeof options.replacements !== "undefined"){
+            for(let [location,replacement] of options.replacements) this.replaceSymbolAtLocation(map, location, replacement);
+        }
         
         // Replace the symbol at this.playerLocation with the PLAYERSYMBOL
         this.replaceSymbolAtLocation(map, this.playerLocation, PLAYERSYMBOL)
 
-        // No mask, just return
+        // Our default mask (may be null/undefined)
+        let mask = this.mask;
+        // If options provides a mask, use that instead
+        if(options.mask || typeof options.mask !== "undefined") mask = options.mask;
+        // No mask, just return the map as-is
         if(!mask || typeof mask === "undefined") return map;
 
         // Iterator for both map and mask
@@ -271,7 +297,7 @@ export class Map extends UTILS.EventListener{
             // If maskarray is empty (All zeroes), do not show any characters on this row
             if(!rowmaskvalue){
                 // Empty row
-                map[i]="                     ";
+                map[i]=" ".repeat(MAPSIZE);
                 continue;
             // If maskarray is all 1's
             }else if(rowmaskvalue == MAPSIZE){
@@ -281,9 +307,9 @@ export class Map extends UTILS.EventListener{
             // In this case some characters in the array are displayed and some are not
             let out = "";
             // Iterator for both mapstringarray and the current mask row(mask[i])
-            // If there's a character at mapstringarray[x] and mask[i][x] is not 0,
-            // then add the character to the output; otherwise add a space
-            for(let x = 0; x < mapstringarray.length; x++) out += mapstringarray[x]&&maskarray[x]? mapstringarray[x] : " ";
+            // If mask[i][x] is not 0, then add the character at mapstringarray[x]
+            // to the output; otherwise add a space
+            for(let x = 0; x < mapstringarray.length; x++) out += maskarray[x]? mapstringarray[x] : " ";
 
             // Replace the map row with the masked output
             map[i] = out;
@@ -321,7 +347,6 @@ export class Map extends UTILS.EventListener{
     replaceSymbolAtLocation(map, location, replacement){
         // Get the row the location is on
         let row = map[location[1]];
-        
         map[location[1]] =                   // Replace the row with
             row.substring(0,location[0])     // The row up to the location y coordinate
             + replacement                    // the replacement symbol
@@ -346,6 +371,69 @@ export class Map extends UTILS.EventListener{
         this.replaceSymbolAtLocation(this.map, location, PORTSYMBOL);
         // Trigger event to let listeners know that there has been a change to our Map
         this.triggerEvent(Map.EVENTTYPES.mapchange, {map: this.map, location});
+    }
+
+    /**
+     * Modifies the provided mask to convert all 0's to 1's. The conversion
+     * is centered on the given location and range is a number of  cells to
+     * convert in a uniform radius
+     * @param {Mask} mask - The mask to modify
+     * @param {Coordinate} location - The epicenter of the conversion
+     * @param {*} range - The distance from the epicenter that will be revealed
+     * @returns {null} - The mask is modified in place
+     */
+    setVision(mask, location, range){
+        /**
+         * A recursive function to determine all the coordinates that fall within
+         * a radius distance from the location 
+         * @param {Object} cache - Our collection of coordinates
+         * @param {Coordinate} location - The location to recurse from
+         * @param {Number} range - How much range we have left to recurse
+         */
+        function recurseRadius(cache, location, range){
+            // DEVNOTE- Doing these first two lines here makes the code cleaner;
+            //          alternatively we could check and add before calling recurseRadius
+            //          for each direction
+
+            // Check to make sure that location is valid
+            // If invalid, return without doing anything
+            if(location[0] < 0 || location[0] > MAPSIZE ||
+                location[1] < 0 || location[1] > MAPSIZE) return;
+
+            // Record the location
+            // We're setting the value to the location so we don't need to reparse it
+            cache[location] = location;
+
+            // Base Case/Exit condition
+            if(range == 0) return;
+
+            // Reduce the range since we've traveled a square
+            range = range - 1;
+
+            // For each direction we can go from this location, recurse on that coordinate
+            // Up
+            recurseRadius(cache, [location[0], location[1]-1], range);
+            // Right
+            recurseRadius(cache, [location[0]+1, location[1]], range);
+            // Down
+            recurseRadius(cache, [location[0], location[1]+1], range);
+            // Left
+            recurseRadius(cache, [location[0]-1, location[1]], range);
+        }
+
+        // We're using an object as it will allow us to only collect unique values
+        // Set does not work with arrays as it uses "===" (identity) to check if
+        // the array is Unique within the Set.
+        let cache = {};
+
+        // Run recursion to get all visible squares
+        recurseRadius(cache, location, range);
+
+        // Set each coordinate to 1 on the mask
+        for(let [x,y] of Object.values(cache)){
+            // Set the mask value at the given coordinate to 1
+            mask[y][x] = 1;
+        }
     }
 
 }

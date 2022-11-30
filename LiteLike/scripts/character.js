@@ -246,7 +246,7 @@ export class PlayerCharacter extends Character{
         // It's arguably more future-proof not to individually pull out statistics
         // and just to copy whole the object over
         // Including some default stats
-        this.statistics = Object.assign({hp: 5, currentHP: 5, vision: 2}, statistics);
+        this.statistics = Object.assign({hp: 5, currentHP: 5, vision: 3}, statistics);
 
         let weapons = [];
         // If there are weapons in equipment, copy the array over

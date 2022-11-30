@@ -11,9 +11,18 @@ var DEMOBUTTONS = {
     };
 
 let menu = document.getElementById("menu");
+menu.insertAdjacentHTML(`beforeend`,`<div id="demos" class="menu" style="display:none;"></div>`)
+
+let mainmenu = document.getElementById("mainmenu");
+mainmenu.insertAdjacentHTML(`beforeend`, `<button id="demobutton">Demos</button>`);
+document.getElementById("demobutton").onclick = ()=>traverseMenu("demos");
+
+let demos = document.getElementById("demos");
+
 for(let [id,info] of Object.entries(DEMOBUTTONS)){
-    menu.insertAdjacentHTML('beforeend',`<button id="${id}"">${info.text}</button>`);
+    demos.insertAdjacentHTML('beforeend',`<button id="${id}"">${info.text}</button>`);
     document.getElementById(id).onclick = info.target;
 }
 
-menu.insertAdjacentHTML("afterend", `<div id="demoBox"></div>`);
+demos.insertAdjacentHTML(`beforeend`, `<button class="back">Main Menu</button>`);
+demos.querySelector("button.back").onclick = ()=>traverseMenu("mainmenu");
