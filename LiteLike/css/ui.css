@@ -38,6 +38,7 @@ body>*{
     animation: statusopen;
     animation-duration: 250ms;
     animation-timing-function: ease-out;
+    overflow: hidden;
 }
 
 .statusbox>.body.hidden{

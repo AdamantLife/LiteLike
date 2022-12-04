@@ -24,6 +24,7 @@ export class MessageLog{
         this.game.COLONY.addEventListener("meeplemodified", this.meepleUpdate.bind(this));
         // When new encounters occur we need to know what to listen for
         this.game.addEventListener("encounterinitialized", this.bindEncounter.bind(this));
+        //TODO: this.game.COLONY.powerlevelmodified
     }
 
     /**
@@ -31,7 +32,7 @@ export class MessageLog{
      */
     setupUI(){
         // In case the Home Page hasn't populated yet
-        let statpanel = document.getElementById("statuspanel");
+        let statpanel = this.game.UI.statuspanel;
         // Setup UI
         statpanel.insertAdjacentHTML("afterbegin", `<div id="messagebox" class="statusbox"><div class="header">System Log<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><div class="fadeoutmask"></div></div></div>`);
         // Setup messagebox hide/show
