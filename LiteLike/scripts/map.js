@@ -246,7 +246,7 @@ export class Map extends UTILS.EventListener{
             this.playerLocation = destination;
 
             // Update Fog-of-War
-            this.setVision(this.mask, this.playerLocation, this.player.statistics.vision);
+            if(this.mask && typeof this.mask !== "undefined") this.setVision(this.mask, this.playerLocation, this.player.statistics.vision);
 
             // Notify that player has moved
             let result = this.triggerEvent(Map.EVENTTYPES.move, {direction, playerLocation: this.playerLocation});

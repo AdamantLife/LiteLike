@@ -1,0 +1,190 @@
+/**
+CSS for specific UI Elements
+*/
+
+body{
+    display: inline-flex;
+}
+
+body>*{
+    padding:10px;
+}
+
+/**      Status Panel ELements        */
+.statusbox{
+    position: relative;
+    font-family: 'Courier New', Courier, monospace;
+    width:25vw;
+    padding-bottom: 5px;
+}
+
+.statusbox>.header{
+    border:solid;
+    border-color: black;
+    width:100%;
+    overflow: hidden;
+    text-align: center;
+    vertical-align: middle;
+    font-weight: bolder;
+    
+}
+
+.statusbox>.body{
+    width:25vw;
+    height:50vh;
+    background-color: white;
+    border: solid;
+    border-top: none;
+    animation: statusopen;
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+}
+
+.statusbox>.body.hidden{
+    height:0vh;
+    animation: statusclose;
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+}
+
+@keyframes statusopen {
+    from{
+        height:0vh;
+    }
+    to{
+        height: 50vh;
+    }
+}
+
+@keyframes statusclose {
+    from{
+        height: 50vh;
+    }
+    to{
+        height:0vh;
+    }
+}
+
+.statusbox button.resize{
+    border: groove;
+    float:right;
+}
+    .statusbox button.resize:hover{
+        background-color: bisque;
+    }
+    .statusbox button.resize::after{
+        content: "\234C";
+    }
+
+.statusbox button.resize.hidden{
+    border:inset;
+}
+    .statusbox button.resize.hidden::after{
+        content: "\2353";
+    }
+
+.fadeoutmask{
+    position: relative;
+    width:100%;
+    top: 75%;
+    height:25%;
+    background: rgb(255,255,255);
+    background: linear-gradient(180deg,rgb(255,255,255,0) 0%, rgb(255,255,255,0.5) 50%,rgb(255,255,255,1) 100%);
+}
+
+#messagebox>.header{
+    background-color: skyblue;
+    color: white;
+}
+
+#resourcebox>.header{
+    background-color: coral;
+    color: white;
+}
+
+/** HOME PAGES */
+/** ADMIN */
+#adminPage fieldset{
+    width:50%;
+    height:100%;
+}
+
+#adminPage>div{
+ width:100%;
+}
+
+#adminPage div:first-of-type(){
+    /* top bar */
+    display:inline-flex;
+    align-items: center;
+}
+
+/**        EVENTS          */
+#events{
+    left: 25vw;
+    width:50vw;
+    top: 25vh;
+    height: 50vh;
+    margin: auto;
+    z-index: 2;
+    background-color: white;
+    border-style: double;
+
+}
+
+#events.shown{
+    animation-name: openevents;
+}
+
+#events.hidden{
+    animation-name: closeevents;
+}
+
+@keyframes openevents {
+    from {
+        display:none !important;
+        width:0px;
+        height:0px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    to {
+        display:initial;
+        width: 50vw;
+        height:50vh;
+        flex-wrap: initial;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+}
+
+@keyframes closeevents {
+    from {
+        display:initial;
+        width: 50vw;
+        height:50vh;
+        flex-wrap: initial;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    to {
+        display:none !important;
+        width:0;
+        height:0;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+}
+
+#events .eventmain{
+    overflow-y: scroll;
+}
+
+#eventexit{
+    position: absolute;
+    left:0;
+    right:0;
+    bottom:3px;
+}

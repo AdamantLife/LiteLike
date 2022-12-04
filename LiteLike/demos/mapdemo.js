@@ -1,6 +1,6 @@
 "use strict";
 
-import {toggleAllButtons, clearDemoBox} from "./utils.js";
+import {toggleAllButtons} from "./utils.js";
 import * as EQUIP from "../scripts/items.js";
 import * as ENCOUNTERS from "../scripts/encounters.js";
 
@@ -15,7 +15,6 @@ var DEMOMAP = ".....................\n.....................\n...................
 export function mapDemo(){
     // Disable all buttons to avoid shenanigans
     toggleAllButtons(true);
-    clearDemoBox();
 
     // Keeps a record of ports cleared
     let PORTSVISITED = [];
@@ -39,6 +38,7 @@ export function mapDemo(){
     GAME.MAP.map = DEMOMAP.split("\n");
 
 
+    document.body.insertAdjacentHTML('beforeend', `<div id="demoBox"></demobox>`);
     // Setup the map area div and get a reference
     document.getElementById("demoBox").insertAdjacentHTML("beforeend",`<div id="mapDemo" style="position:relative;">
     <div id="events" class="popup hidden"></div>
@@ -326,6 +326,7 @@ export function mapDemo(){
             // Set victor to make sure that combatloop ends
             combat.victor = combat.enemy;
         }
+        document.getElementById("demoBox").remove();
     }
 
     // Enable Map Movement

@@ -1,6 +1,6 @@
 "use strict";
 
-import {toggleAllButtons, clearDemoBox} from "./utils.js";
+import {toggleAllButtons,} from "./utils.js";
 import * as IO from "../scripts/io.js";
 import * as UTILS from "../scripts/utils.js";
 import {HUNGERRATE, Sector, unlocks} from "../scripts/colony.js";

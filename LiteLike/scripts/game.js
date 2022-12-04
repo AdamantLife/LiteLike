@@ -4,6 +4,8 @@ import {PlayerCharacter, roles} from "./character.js";
 import { TheColony } from "./colony.js";
 import {Map} from "./map.js";
 import { Encounter, EncounterSequence } from "./encounters.js";
+import {GameGUI} from "./gui/game.js";
+import { MessageLog } from "./messagelog.js";
 
 import * as IO from "./io.js";
 import * as EQUIP from "./items.js";
@@ -46,7 +48,7 @@ export class Game extends UTILS.EventListener{
             .then(result=>{this.STRINGS = result;}) // Store the Language Lookup Object in STRINGS
             .catch(error=> console.log(error));
 
-        // Database of all items
+        // Database of all objets from items.js
         this.ITEMS = null;
         // Load the items
         IO.loadItems()
@@ -77,6 +79,36 @@ export class Game extends UTILS.EventListener{
 
         // Current ENCOUNTER
         this.ENCOUNTER = null;
+
+        // The Message Log
+        this.MESSAGELOG = null;
+
+        // The Game's main GUI screen
+        this.UI = null;
+    }
+
+    /**
+     * Creates the skeletal framework for the Game Interface
+     * @param {Boolean} [all=false] - Whether or not to setup all child UI's as well
+     */
+    setupUI(){
+        this.UI = new GameGUI(this);
+        this.UI.setupUI();
+        this.COLONY.setupUI();
+        this.MESSAGELOG.setupUI();
+    }
+
+    /**
+     * Initializes all the required objects to start a New Game
+     */
+    newGame(){
+        this.PLAYER = this.startingCharacter();
+        this.COLONY = this.initializeColony();
+        // When starting a name game, the player/colony starts
+        // out with 3 batteries
+        this.COLONY.addResource(1,3);
+        this.MAP = this.newMap();
+        this.MESSAGELOG = new MessageLog(this);
     }
 
     /**
@@ -177,4 +209,5 @@ export class Game extends UTILS.EventListener{
     }
 }
 
-window.GAME = new Game(JSON.parse(`{"i":7,"j":8,"S":[250,210,70,5,116,152,156,50,109,197,228,20,149,6,176,124,151,69,33,148,196,45,94,41,171,90,73,91,218,61,212,206,137,44,213,118,227,38,180,93,15,208,233,145,17,187,11,205,108,78,115,138,77,16,54,87,88,242,39,175,21,128,253,193,10,66,80,129,191,18,29,173,104,142,105,214,161,204,67,71,40,12,133,203,7,107,143,89,254,127,255,144,234,241,100,238,150,60,185,225,140,172,247,216,200,232,1,32,114,113,2,99,24,51,64,9,42,230,201,177,219,123,164,186,14,162,221,52,26,184,163,194,122,220,167,157,68,155,19,166,131,92,53,48,97,125,27,248,146,192,215,55,35,209,74,111,251,47,46,240,243,25,195,207,178,95,139,147,246,49,98,211,119,226,102,183,85,83,189,188,170,63,22,56,252,72,81,4,112,199,202,174,154,223,132,106,120,43,28,76,57,117,229,84,136,30,0,121,23,165,190,126,96,3,245,36,249,168,101,65,135,231,59,244,141,110,34,235,239,58,179,8,198,169,79,82,86,62,130,222,103,159,31,237,236,182,153,134,37,75,158,160,224,181,13,217]}`));
+let DEBUGSEED = JSON.parse(`{"i":7,"j":8,"S":[250,210,70,5,116,152,156,50,109,197,228,20,149,6,176,124,151,69,33,148,196,45,94,41,171,90,73,91,218,61,212,206,137,44,213,118,227,38,180,93,15,208,233,145,17,187,11,205,108,78,115,138,77,16,54,87,88,242,39,175,21,128,253,193,10,66,80,129,191,18,29,173,104,142,105,214,161,204,67,71,40,12,133,203,7,107,143,89,254,127,255,144,234,241,100,238,150,60,185,225,140,172,247,216,200,232,1,32,114,113,2,99,24,51,64,9,42,230,201,177,219,123,164,186,14,162,221,52,26,184,163,194,122,220,167,157,68,155,19,166,131,92,53,48,97,125,27,248,146,192,215,55,35,209,74,111,251,47,46,240,243,25,195,207,178,95,139,147,246,49,98,211,119,226,102,183,85,83,189,188,170,63,22,56,252,72,81,4,112,199,202,174,154,223,132,106,120,43,28,76,57,117,229,84,136,30,0,121,23,165,190,126,96,3,245,36,249,168,101,65,135,231,59,244,141,110,34,235,239,58,179,8,198,169,79,82,86,62,130,222,103,159,31,237,236,182,153,134,37,75,158,160,224,181,13,217]}`);
+window.GAME = new Game(DEBUGSEED);

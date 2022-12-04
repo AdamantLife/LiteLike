@@ -2,12 +2,13 @@ import * as UTILS from "./utils.js";
 import * as ITEMS from "./items.js";
 import {Timer} from "./utils.js";
 import { sectorCallbacks } from "./callbacks.js";
+import { TheColonyGUI } from "./gui/colony.js";
 
 // NOTE: powerLevel is our analog for "strength of the fire" in A Dark Room
 //          powerLevel is fueled by Batteries (the most basic resource; i.e.- Wood)
 
 // Max powerLevel of TheColony
-const MAXPOWER = 10;
+export const MAXPOWER = 10;
 // How often Meeple get Hungery (in ms)
 export const HUNGERRATE = 10000;
 
@@ -21,7 +22,7 @@ export const BASEMEEPLE = 5;
 // The Facilities which unlock resource-gathering Jobs for Meeple
 // This would be things like the Coal Mine or Steel Mine in A Dark Room
 /** TODO: Fill in names */
-export const unlocks = UTILS.enumerate("ENGINEER","FARMER","AGRICULTURE","D","E","F");
+export const unlocks = UTILS.enumerate("SCAVENGE","ENGINEER","FARMER","AGRICULTURE","D","E","F");
 
 // Sectors are base upgrades
 export const sectors = UTILS.enumerate(
@@ -42,6 +43,7 @@ export class TheColony extends UTILS.EventListener{
         "startupdate","endupdate",
         "startmeepleupdate", "endmeepleupdate",
         "startsectorupdate", "endsectorupdate",
+        "powerlevelmodified",
         "resourcesmodified", "meeplemodified",
         "sectoradded", "sectorexpanded", "noresources",
         "unlockadded", "nounlock",
@@ -51,40 +53,61 @@ export class TheColony extends UTILS.EventListener{
     /**
      * 
      * @param {Game} game - The current Game Object
-     * @param {Number} powerLevel - The amount of power running through the base
-     * @param {Sector[]} sectors - An array of Sector instances
-     * @param {Symbol[]} unlocks - An array of unlock symbols
-     * @param {Resource[]} resources - An array containing Resource Instances
-     * @param {Meeple[]} meeples - An  array containing Meeple Instances
+     * @param {Number} [powerLevel=0] - The amount of power running through the base
+     * @param {Sector[]} [sectors] - An array of Sector instances
+     * @param {Symbol[]} [unlocks] - An array of unlock symbols
+     * @param {Object} [storage] - The Colony's storage
+     * @param {ITEMS.Weapon[]} [storage.weapons]- An array containing Weapon Instances
+     * @param {ITEMS.Item[]} [storage.items]- An array containing Item Instances
+     * @param {ITEMS.Resource[]} [storage.resources] - An array containing Resource Instances
+     * @param {Meeple[]} [meeples] - An  array containing Meeple Instances
      */
-    constructor(game, powerLevel, sectors, unlocks, resources, meeples){
+    constructor(game, powerLevel=0, sectors=[], unlocks=[], storage={}, meeples=[]){
         super(TheColony.EVENTTYPES);
         this.game = game;
         this.powerLevel = 0;
         if(Number.isInteger(powerLevel)) this.powerLevel = Math.min(Math.max(0, powerLevel), MAXPOWER);
 
-        let sect = [];
-        if(sectors && typeof sectors !== "undefined") sect = Array.from(sectors);
-        this.sectors = sect;
+        this.sectors = Array.from(sectors);
 
-        let unl = []
-        if(unlocks && typeof unlocks !== "undefined") unl = Array.from(unlocks);
-        this.unlocks = unl;
+        this.unlocks = Array.from(unlocks);
 
-        let res = [];
-        if(resources && typeof resources !== "undefined") res = resources;
-        this.resources = [];
-        // sort resources into this.resources
-        for(let resource of res){
-            // Make sure we aren't sorting an empty index/object
-            if(resource && typeof resource !== "undefined") continue;
-            // Store the resource at it's id
-            this.resources[resource.resourceType.id] = resource;
+        // TheColony has its own Storage
+        this.storage = {weapons:[], items:[], resources:[]};
+
+        let wps = [];
+        if(storage.weapons && typeof storage.weapons !== "undefined") wps = storage.weapons;
+        // sort weapons into this.weapons
+        for(let [id,qty] of wps){
+            this.weapons[id] = qty;
         }
 
-        let mep  = [];
-        if(meeples && typeof meeples !== "undefined") mep = Array.from(meeples);
-        this.meeples = mep;
+        let its = [];
+        if(storage.items && typeof storage.items !== "undefined") its = storage.items;
+        // sort resources into this.resources
+        for(let [id,qty] of its){
+            this.items[id] = qty;
+        }
+
+        let res = [];
+        if(storage.resources && typeof storage.resources !== "undefined") res = storage.resources;
+        // sort resources into this.resources
+        for(let [id,qty] of res){
+            this.resources[id] = qty;
+        }
+
+        this.meeples = Array.from(meeples);
+
+        this.ui = null;
+    }
+    
+    get weapons(){ return this.storage.weapons; }
+    get items(){ return this.storage.items; }
+    get resources(){ return this.storage.resources; }
+
+    setupUI(){
+        this.ui = new TheColonyGUI(this);
+        this.ui.setupUI();
     }
 
     /**
@@ -132,10 +155,23 @@ export class TheColony extends UTILS.EventListener{
             if(this.resources[res]
                 && typeof this.resources[res] !== "undefined"
                 && this.resources[res] >= qty) continue;
-            // We don't have enough resources, so log it
+            // We don't have enough resources, so log it at it's id index
             noresources[res] = qty;
         }
         return noresources;
+    }
+
+    /**
+     * Returns the quantity TheColony has of the given resourceid
+     * 
+     * @param {Number} resourceid - the Resource's ResourceType id
+     * @returns {Number} - The quantity of that resource
+     */
+    getResource(resourceid){
+        let qty = this.resources[resourceid];
+        // Do not have the resource
+        if(qty === null || typeof qty == "undefined") return null;
+        return qty;
     }
 
     /**
@@ -169,6 +205,23 @@ export class TheColony extends UTILS.EventListener{
 
         // Add qty to our Resource's quantity
         this.resources[resource] += qty;
+    }
+
+    /**
+     * Increases TheColony's current powerlevel so long as TheColony has the resources to do so
+     */
+    increasePowerLevel(){
+        // Use checkCost to make sure we can afford the power increase
+        let noresources = this.checkCost([[1,1]]);
+        // We did not have enough resources
+        if(noresources.length) return this.triggerEvent(TheColony.EVENTTYPES.noresources, {noresources});
+        // Pay the cost
+        this.resources[1]-=1
+        // Incrase power level
+        this.powerLevel+=1;
+        // Let listeners know
+        this.triggerEvent(TheColony.EVENTTYPES.powerlevelmodified, {powerlevel: this.powerLevel});
+        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [[1,1]]});
     }
 
     /**
@@ -277,7 +330,9 @@ export class TheColony extends UTILS.EventListener{
         let [resourcechange, deadmeeple] = this.resolveMeeple();
 
         // We gained and/or loss resources, so Trigger event
-        if(resourcechange.length) this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange});
+        // NOTE- that resolveMeeple's resourcechange is an Object with keys=id, values=qty
+        //          For the resourcechange event we should be returning length-2 arrays of [id, qty]
+        if(resourcechange.length) this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange:Object.entries(resourcechange)});
 
         // We loss Meeple, so Trigger Event
         if(deadmeeple.length) this.triggerEvent(TheColony.EVENTTYPES.meeplemodified, {deadmeeple});
@@ -502,7 +557,7 @@ export class TheColony extends UTILS.EventListener{
         }
 
         // Notify that we paid resources
-        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {cost: item.shopCost});
+        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: item.shopCost});
 
         // If a generic item Types, convert to appropriate item instance
         // Assume quantity of 1 for Items and Resources
@@ -523,7 +578,7 @@ export class TheColony extends UTILS.EventListener{
         if(item.constructor.name === "Resource"){
             this.addResource(item);
             // Notify that we gained resources
-            this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: item});
+            this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [item.resourcetype.id, item.qty]});
         }
         else{
             // NOTE: TODO: We probably want to trigger a equipmentchange event, in which case
@@ -704,7 +759,7 @@ export class Sector {
         // Signal that we have upgraded
         colony.triggerEvent(TheColony.EVENTTYPES.sectorexpanded, {sector: this});
         // Signal that resources have changed
-        colony.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {cost});
+        colony.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcehange:cost});
 
         return this;
     }

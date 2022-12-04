@@ -1,9 +1,21 @@
+/**
+Generic CSS and CSS-Styled Widgets
+*/
+
+body{
+    width:100%;
+    height:100%;
+}
+
 p{
     white-space: pre-line;
 }
 
 table.boldfirst tr>td:first-of-type{
     font-weight: bold;
+}
+table.quantitytable tr>td:first-of-type{
+    width:100%;
 }
 
 .popup {
@@ -68,76 +80,6 @@ table.boldfirst tr>td:first-of-type{
             width:0px;
         }
     }
-
-#events{
-    left: 25vw;
-    width:50vw;
-    top: 25vh;
-    height: 50vh;
-    margin: auto;
-    z-index: 2;
-    background-color: white;
-    border-style: double;
-
-}
-
-#events.shown{
-    animation-name: openevents;
-}
-
-#events.hidden{
-    animation-name: closeevents;
-}
-
-@keyframes openevents {
-    from {
-        display:none !important;
-        width:0px;
-        height:0px;
-        flex-wrap: nowrap;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-    to {
-        display:initial;
-        width: 50vw;
-        height:50vh;
-        flex-wrap: initial;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-}
-
-@keyframes closeevents {
-    from {
-        display:initial;
-        width: 50vw;
-        height:50vh;
-        flex-wrap: initial;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-    to {
-        display:none !important;
-        width:0;
-        height:0;
-        flex-wrap: nowrap;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-}
-
-#events .eventmain{
-    overflow-y: scroll;
-}
-
-#eventexit{
-    position: absolute;
-    left:0;
-    right:0;
-    bottom:3px;
-}
-
 
 .splitbutton>button:first-of-type{
     border-style: outset none outset outset;
