@@ -1,6 +1,16 @@
 {
     "sector":[
         {
+            "sectorType": "SCRAP",
+            "prerequisites":[],
+            "maxLevel": 3,
+            "resourcesRequired":[
+                [2, 10]
+            ],
+            "flags":[],
+            "collectionTime":30000
+        },
+        {
             "sectorType":"RESIDENTIAL",
             "prerequisites":[],
             "maxLevel":10,

@@ -73,3 +73,103 @@ export function attachPanelResizeCallback(panel){
     }
     resize.onclick = callback;
 }
+
+/**
+ * Parses a Color Hexstring into an object {r:Integer, g:Integer, b:Integer}
+ * @param {*} color - The Hexstring to parse
+ * @returns {Object} - An object with r, g, and b values as Integers corresponding to the parsed hexstring
+ */
+function parseHexString(color){
+    // This regex acccepts the Hexstring either starting with the # sign or without it
+    // It has two possible captures: 3 single Hexidecimal characters ending at the end of the string
+    //                               or 3 pairs of Hexidecimal cahracters ending at the end of the string
+    let result = /^#?(?:([0-9a-f])([0-9a-f])([0-9a-f])$|([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$)/i.exec(color);
+
+    // Invalid Color Code, return null
+    if(!result) return;
+
+    // If a single character (result[1]) was not captured, use result[4], otherwise use result[1]
+    // Then parseInt the string with base 16
+    let r = parseInt(typeof result[1] == "undefined" ? result[4] : result[1], 16);
+    // Repeat for g and b
+    let g = parseInt(typeof result[2] == "undefined" ? result[5] : result[2], 16);
+    let b = parseInt(typeof result[3] == "undefined" ? result[6] : result[3], 16);
+    // Make sure all values are Integers
+    // If any are not numbers, return null
+    if(isNaN(r) || isNaN(g) || isNaN(b)) return;
+    // Finally, return the RGB object
+    return {r, g, b};
+}
+
+/**
+ * Converts an object containing r, g, and b integer values into a Color Hexstring
+ * @param {Object} color - An object with r, g, and b values as integers
+ */
+function createHexString(color){
+    function padConvert(int){
+        // Convert to Hex value (string)
+        let result = Number(int).toString(16);
+        // Pad single digit values with leading 0
+        if(result.length == 1) result = "0"+result;
+        return result;
+    }
+    return "#"+padConvert(color.r)+padConvert(color.g)+padConvert(color.b);
+}
+
+/**
+ * Given a start and stop color, a duration for a transformation function
+ * to convert from start to stop, and assuming the transformation is linear
+ * estimate what color is displayed at a specific time
+ * @param {String} colorA - Hexcode for the Start Color
+ * @param {String} colorB - Hexcode for the Stop Color
+ * @param {Number} duration - How long it takes for the transformation to take place; note that this should be in the same units as attime
+ * @param {Number} attime - The desired point in the transformation to estimate the color
+ * @returns {String} - The Hexcode for the estimated color at attime
+ */
+export function calcColorTransition(colorA, colorB, duration, attime){
+    // If attime is negative or zero, then we already know it's colorA
+    if(attime <= 0) return colorA;
+    // If attime is greater or equal to duration, then we already know it's colorB
+    if(attime >= duration) return colorB;
+    // Convert colors to rgb values
+    colorA = parseHexString(colorA);
+    colorB = parseHexString(colorB);
+
+    // If we can't parse A or B, just return that unparseable value back
+    // DEVNOTE- As in other places, we should technically raise an error,
+    //          but that's something we decided not to do in the code
+    if(!colorA) return colorA;
+    if(!colorB) return colorB;
+
+    // Calculate value-change per unit duration for each rgb
+    // DEVNOTE- This is only valid for linear transformations: the code would
+    //          have to be adjusted to account for non-linear transforms
+    let delta = {
+        r: (colorA.r - colorB.r) / duration,
+        g: (colorA.g - colorB.g) / duration,
+        b: (colorA.b - colorB.b) / duration
+    }
+
+    // Calculate the new value by offsetting
+    // colorA by (change/unittime * attime)
+    // Round it in order to generate a valid color value
+    let result = {
+        r: Math.floor(colorA.r + (delta.r * attime)),
+        g: Math.floor(colorA.g + (delta.g * attime)),
+        b: Math.floor(colorA.b + (delta.b * attime))
+    }
+
+    // Convert back to hexstring
+    return createHexString(result);
+}
+
+/**
+ * Callback which removes the manually-set properties of a progressbar.
+ * Should be the callback for eventListener(animation) (which this function also removes)
+ * @param {Event} event- animation event
+ */
+ export function clearPartialProgress(event){
+    event.target.style.width = "revert-layer";
+    event.target.style.backgroundColor = "revert-layer";
+    event.target.style.transitionDuration = "";
+}

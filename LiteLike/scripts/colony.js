@@ -22,10 +22,13 @@ export const BASEMEEPLE = 5;
 // The Facilities which unlock resource-gathering Jobs for Meeple
 // This would be things like the Coal Mine or Steel Mine in A Dark Room
 /** TODO: Fill in names */
-export const unlocks = UTILS.enumerate("SCAVENGE","ENGINEER","FARMER","AGRICULTURE","D","E","F");
+export const unlocks = UTILS.enumerate(
+    "SECTORS", // unlocks the sectors Tab (our version of "A Silent Forest") and SCRAP
+    "ENGINEER","FARMER","AGRICULTURE","D","E","F");
 
 // Sectors are base upgrades
 export const sectors = UTILS.enumerate(
+    "SCRAP", // Our version of "Gather Wood"
     "RESIDENTIAL",  // Our version of Houses
     "SCOUTBOTS",   // Our version of Traps
     "AGRICULTURE"   // new sector
@@ -45,7 +48,8 @@ export class TheColony extends UTILS.EventListener{
         "startsectorupdate", "endsectorupdate",
         "powerlevelmodified",
         "resourcesmodified", "meeplemodified",
-        "sectoradded", "sectorexpanded", "noresources",
+        "sectoradded", "sectorexpanded", "sectortriggered",
+        "noresources",
         "unlockadded", "nounlock",
         "badtimer"
         );
@@ -67,6 +71,9 @@ export class TheColony extends UTILS.EventListener{
         this.game = game;
         this.powerLevel = 0;
         if(Number.isInteger(powerLevel)) this.powerLevel = Math.min(Math.max(0, powerLevel), MAXPOWER);
+        // TheColony's Power Meter
+        // Every minute (60 seconds * 1000ms), the power decreases
+        this.powerTimer = new Timer(undefined, 60000);
 
         this.sectors = Array.from(sectors);
 
@@ -219,9 +226,11 @@ export class TheColony extends UTILS.EventListener{
         this.resources[1]-=1
         // Incrase power level
         this.powerLevel+=1;
+        // If we were at 0 powerLevel, reset our powerTimer
+        if(this.powerLevel == 1) this.powerTimer.reset();
         // Let listeners know
-        this.triggerEvent(TheColony.EVENTTYPES.powerlevelmodified, {powerlevel: this.powerLevel});
-        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [[1,1]]});
+        this.triggerEvent(TheColony.EVENTTYPES.powerlevelmodified, {powerlevel: this.powerLevel, change:+1});
+        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [[1,-1]]});
     }
 
     /**
@@ -280,6 +289,9 @@ export class TheColony extends UTILS.EventListener{
         // If sector is already Level 1+, grant its unlocks
         if(sector.level >= 1) sector.setflags();
 
+        // Reestablish Timer
+        sector.newTimer();
+
         // Trigger the sectoradded event
         this.triggerEvent(TheColony.EVENTTYPES.sectoradded, {sector});
 
@@ -293,6 +305,8 @@ export class TheColony extends UTILS.EventListener{
     colonyLoop(){
         // Get now() so all functions are using the same now()
         let now = UTILS.now();
+
+        this.powerLoop(now);
 
         // Trigger the startupdate event
         this.triggerEvent(TheColony.EVENTTYPES.startupdate, {now});
@@ -309,6 +323,31 @@ export class TheColony extends UTILS.EventListener{
 
         // Set next timeout
         this.loopid = window.setTimeout(this.colonyLoop.bind(this), UTILS.LOOPRATE);
+    }
+
+    /**
+     * Updates the powerTimer and The Colony's powerlevel if necessary
+     * @param {Number} now - performance.now
+     */
+    powerLoop(now){
+        // If timer is frozen, return without doing anything
+        if(this.powerTimer.isFrozen) return;
+
+        // Get now if not provided
+        if(!now || typeof now =="undefined") now = UTILS.now();
+        // Update the powerTimer's state
+        this.powerTimer.updateCycles(now);
+        // Not ready so don't do anything
+        if(!this.powerTimer.isReady) return;
+        // Timer has completed a new cycle
+        // clear it
+        this.powerTimer.clearReady();
+        // If powerLevel is already 0, freeze and do nothing
+        if(!this.powerLevel) return this.powerTimer.freeze();
+        // Decrease powerlevel (min 0)
+        this.powerLevel = Math.max(this.powerLevel - 1 , 0);
+        // Let listeners know
+        this.triggerEvent(TheColony.EVENTTYPES.powerlevelmodified, {powerlevel: this.powerLevel, change:-1});
     }
 
     /**
@@ -494,7 +533,7 @@ export class TheColony extends UTILS.EventListener{
         // Make sure timer is ready
         // DEVNOTE- Unlike above, we will trigger an event in this case as it
         //          is potentially a common miscall
-        if(!sector.timer.isReady) return this.triggerEvent("badtimer", {target: sector});
+        if(!sector.timer.isReady) return this.triggerEvent("badtimer", {sector});
 
         // Sector is ready, so call 
         sectorCallbacks[sector.sectorType.description](sector, this, this.game.random);
@@ -504,6 +543,9 @@ export class TheColony extends UTILS.EventListener{
 
         // NOTE- Normally, all sectors should be frozen
         if(sector.timer.isFrozen) sector.timer.unfreeze();
+
+        // Notify listeners
+        this.triggerEvent(TheColony.EVENTTYPES.sectortriggered, {sector});
     }
 
     /**
@@ -557,7 +599,7 @@ export class TheColony extends UTILS.EventListener{
         }
 
         // Notify that we paid resources
-        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: item.shopCost});
+        this.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: item.invertedShopCost});
 
         // If a generic item Types, convert to appropriate item instance
         // Assume quantity of 1 for Items and Resources
@@ -759,7 +801,7 @@ export class Sector {
         // Signal that we have upgraded
         colony.triggerEvent(TheColony.EVENTTYPES.sectorexpanded, {sector: this});
         // Signal that resources have changed
-        colony.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcehange:cost});
+        colony.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange:cost});
 
         return this;
     }

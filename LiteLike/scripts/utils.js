@@ -13,6 +13,7 @@ export function enumerate(){
     // Add all arguments to the object, using them as the key
     // and their Symbol as the value
     for(let a of arguments) _s[a] = Symbol(a);
+    _s.index = (value)=>Object.values(_s).indexOf(value);
     // Return a frozen version of the object
     return Object.freeze(_s);
 }
@@ -249,6 +250,16 @@ export class Timer {
      */
     get isFrozen(){
         return Boolean(this._frozen);
+    }
+
+    /**
+     * Returns the difference between rate and this.getOffsetTime (which
+     * is the modulo of the current cycle: i.e.- the amount of time that
+     * has elapsed in the current cycle)
+     * @returns {Number} - The time remaining until the next cycle
+     */
+    remaining(){
+        return this.rate - this.getOffsetTime(now());
     }
 
     /**

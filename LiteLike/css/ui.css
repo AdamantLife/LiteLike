@@ -66,6 +66,10 @@ body>*{
     }
 }
 
+.statusbox>.body>ul{
+    padding-inline-start: 5px;
+}
+
 .statusbox button.resize{
     border: groove;
     float:right;
@@ -74,14 +78,15 @@ body>*{
         background-color: bisque;
     }
     .statusbox button.resize::after{
-        content: "\234C";
+        content: "\2353";
     }
 
 .statusbox button.resize.hidden{
     border:inset;
 }
     .statusbox button.resize.hidden::after{
-        content: "\2353";
+        content: "\234C";
+        
     }
 
 .fadeoutmask{
@@ -104,6 +109,17 @@ body>*{
 }
 
 /** HOME PAGES */
+/** NAVBAR */
+#homenavbar>*{
+    margin-right: 1em;
+}
+#homenavbar>button:disabled {
+    background: linear-gradient(180deg, rgb(221 34 34) 0%, rgb(178,34,34) 100%);
+    border-radius: 2px;
+    background-color: firebrick;
+    color: white;
+}
+
 /** ADMIN */
 #adminPage fieldset{
     width:50%;
@@ -118,6 +134,14 @@ body>*{
     /* top bar */
     display:inline-flex;
     align-items: center;
+}
+
+/** SECTORS */
+#sectorsPage td.task.progress button{
+    display: none;
+}
+#sectorsPage td.task.collect div.progressbar{
+    display: none;
 }
 
 /**        EVENTS          */

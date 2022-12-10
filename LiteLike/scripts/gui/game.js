@@ -1,10 +1,21 @@
 "use-strict";
 
+import { makeTranslationLookup } from "../io.js";
+import { enumerate } from "../utils.js";
+
 export class GameGUI{
+    // Generic Translations
+    STRINGS = enumerate(
+        // None
+        "NONE"
+    )
+
     constructor(game){
         this.game = game;
         this.pages = [];
         this.currentpage = null;
+
+        this.translate = makeTranslationLookup(this.game, this.STRINGS, "game");
     }
 
     get statuspanel(){ return document.getElementById("statuspanel"); }
@@ -25,7 +36,7 @@ export class GameGUI{
     registerPage(id, displayname){
         this.homenavbar.insertAdjacentHTML("beforeend", `<button id="${id}">${displayname}</button>`);
         let button = this.homenavbar.lastElementChild;
-        button.onclick = ()=>setPage(button);
+        button.onclick = ()=>this.setPage(button);
         return button;
     }
     /**

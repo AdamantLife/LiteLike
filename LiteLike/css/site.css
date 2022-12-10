@@ -47,6 +47,21 @@ table.quantitytable tr>td:first-of-type{
     height:100%;
 }
 
+.progressbar.disabled{
+    background-image: repeating-linear-gradient(
+                45deg,
+                yellow 0 .5rem,
+                black .5rem 1rem
+            );
+    background-size:200% 200%;
+    animation:progressdisabled 5s linear infinite 0s;
+}
+    @keyframes progressdisabled {
+        100%{
+            background-position: 100% 100%;
+        }
+    }
+
 .progressbar.warmup>div.inner{
     animation-name: warmup;
     animation-timing-function: linear;

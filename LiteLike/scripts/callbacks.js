@@ -25,6 +25,19 @@ function heal(target, value){
 
 export const itemCallbacks = Object.freeze({HEAL:heal });
 
+/**
+ * Callback for the Scrap Sector (our version of Gather Wood)
+ * Grants The Colony an amount of wood based on the sector's level without variance
+ * @param {COLONY.Sector} sector - The Residential Sector
+ * @param {COLONY.TheColony} colony - The Colony
+ * @param {seedrandom} random - The Game instance's seedrandom
+ */
+function scrap(sector, colony, random){
+    // Add resources to TheColony
+    colony.addResource(2, sector.level * 5);
+    // Let listeners know that resources have been changed
+    colony.triggerEvent(COLONY.TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [ [2, sector.level * 5]]});
+}
 
 /**
  * Callback for the Residential Sector.
@@ -126,4 +139,4 @@ function agriculture(sector, colony, random){
     colony.addResource(0, COLONY.RESIDENTIALMEEPLE * sector.level);
 }
 
-export const sectorCallbacks = Object.freeze({ RESIDENTIAL: residential, SCOUTBOTS: scoutbots, AGRICULTURE: agriculture});
+export const sectorCallbacks = Object.freeze({ SCRAP: scrap, RESIDENTIAL: residential, SCOUTBOTS: scoutbots, AGRICULTURE: agriculture});

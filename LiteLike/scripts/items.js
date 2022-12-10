@@ -38,6 +38,10 @@ class ShopItem {
         this.shopPrerequisites = shopPrerequisites;
         this.shopCost = shopCost;
     }
+    /** Converts the shopCost from positive quantities to negative quantities */
+    get invertedShopCost(){
+        return this.shopCost.map(([resource,qty])=>[resource, -qty]);
+    }
 }
 
 /**

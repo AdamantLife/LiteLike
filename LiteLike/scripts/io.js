@@ -99,11 +99,13 @@ export function loadColony(){
         // Jobs are standard format
         jobs = parseStandardJson(data.job, COLONY.Job);
         // Sectors can be parsed as standard format, but we need to update their sectorType
-        sectors = parseStandardJson(data.sector, COLONY.Sector);
+        let _sectors = parseStandardJson(data.sector, COLONY.Sector);
 
-        for(let sector of Object.values(sectors)){
+        for(let sector of _sectors){
             // Converting sectorType to the Enumerated Symbol
             sector.sectorType = COLONY.sectors[sector.sectorType];
+            // Converting Sector Array to Object with sectorType as key
+            sectors[sector.sectorType] = sector;
         }
 
         return {jobs, sectors};
@@ -231,4 +233,49 @@ export function getStrings(language, object){
             return {"name":"Unknown", "flavor": "Unknown"}
     }
     return dict[id];
+}
+
+/**
+ * Returns a function that can be used to translate any valid, predetermined, enumerated key into a
+ * a String for the current Game Langauage
+ * 
+ * @param {Game} game - The game object in order to determine current language
+ * @param {Object} strings - Enumeration for the current UI element defining all valid translation lookups
+ * @param {String} key - The key in Language.ui that corresponds to the current UI
+ * @returns {Function} - the translation function
+ */
+export function makeTranslationLookup(game, strings, key){
+    /**
+     * Translates the given symbol into the Game's current language
+     * @param {Symbol} _enum - The enumerated 
+     * @param {Object|null} [isTemplate=null] - If provided, isTemplate should be an object which will be used to replace ${key} 
+     * @returns {String}- The translated string
+     */
+    function translate(_enum, isTemplate = false){
+        // Translated strings are located in game.LANGUAGE
+        // key is the translation lookup for the current UI
+        // Each index of strings (the enumerated object provided on creation)
+        //  should correspond to the same index in the translation lookup
+        let string = game.STRINGS.ui[key][strings.index(_enum)];
+
+        // If this is not a template that needs replacement, just return the string
+        if(!isTemplate) return string;
+
+        // Otherwise, we define a function that will pull the correct substitues
+        // out of the isTemplate object in order to format the string
+        // The function signature for replacement functions is:
+        // (match, ...groupmatches, offset, string, groups)
+        // so if we had more groups in our regex, we would need to adjust it to account
+        // for them.
+        // DEVNOTE- originally I had this written as ()=>isTemplate[arguments[arguments.length-1].name];
+        //  but I decided it was easier to read like this; the first way is useful if we don't know how
+        //  many groups there are going to be and just want access to the groups parameter (which is always
+        //  the last index)
+        let lookup = (match, group1, group2, offset, string, groups)=>isTemplate[groups.name];
+        // Replace all matches for our regex with the result of lookup(...matchargs)
+        // The regex matches "${[non-whitespace-characters]}" and pulls the
+        // non-whitespace-characters out as the "name" group
+        return string.replace(/(\${(?<name>\w+)})/g, lookup);
+    }
+    return translate;
 }

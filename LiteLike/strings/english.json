@@ -110,12 +110,16 @@
 
     "sector":[
         {
+            "name": "Scavenge Scrap",
+            "flavor": "Take The Colony's Scrap Collector out for a joy ride."
+        },
+        {
             "name": "Residential Sector",
-            "flavor": "Housing for residents of The Colony"
+            "flavor": "Housing for residents of The Colony."
         },
         {
             "name": "Scout Bots",
-            "flavor": "This sector maintains Scout Bots which periodically scout nearby planets for food and supplies"
+            "flavor": "This sector maintains Scout Bots which periodically scout nearby planets for food and supplies."
         },
         {
             "name": "Farm Bots",
@@ -131,5 +135,54 @@
             "name": "Charge Batteries",
             "flavor": "The works run on (futuristically-efficient) treadmills in order to charge batteries"
         }
-    ]
+    ],
+    "ui":{
+        "game":[
+            "None"
+        ],
+        "colony":[
+            "Resources",
+            "Requires",
+            "Sectors",
+            "Replace Batteries",
+            "Residents",
+            "Sectors",
+            "Construct",
+            "Dark",
+            "Shadowy",
+            "Dim",
+            "Lighted",
+            "Bright",
+            "Shining",
+            "Shell",
+            "Base",
+            "",
+            "",
+            "Community",
+            "Colony",
+            "Inoperable",
+            "Operational",
+            "Fully Operational",
+            "Repair",
+            "Expand",
+            "Maximum Efficiency",
+            "Collect"
+        ],
+        "messagelog":[
+            "System Log",
+            "You exchange old batteries for new ones",
+            "The last of the power drains from the ${population}",
+            "The ${population} is barely operational",
+            "The lights are dim around the ${population}",
+            "",
+            "",
+            "The ${population} is fully lit"
+
+        ],
+        "gameplay":[
+            "With your mech badly damaged, you seek refuge within a dark shell.",
+            "The dark shell sputters as the new batteries resuscitate it",
+            "Looking around the hull in the dim light, you spot a salvaging rig. You think you can get it working with the scrap you have."
+        ]
+    }
 }
