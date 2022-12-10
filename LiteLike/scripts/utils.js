@@ -256,10 +256,12 @@ export class Timer {
      * Returns the difference between rate and this.getOffsetTime (which
      * is the modulo of the current cycle: i.e.- the amount of time that
      * has elapsed in the current cycle)
+     * @param {Number} _now - performance.now
      * @returns {Number} - The time remaining until the next cycle
      */
-    remaining(){
-        return this.rate - this.getOffsetTime(now());
+    remaining(_now){
+        if(typeof _now === "undefined") _now = now();
+        return this.rate - this.getOffsetTime(_now);
     }
 
     /**

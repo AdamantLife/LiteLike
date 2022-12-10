@@ -145,9 +145,9 @@ export function calcColorTransition(colorA, colorB, duration, attime){
     // DEVNOTE- This is only valid for linear transformations: the code would
     //          have to be adjusted to account for non-linear transforms
     let delta = {
-        r: (colorA.r - colorB.r) / duration,
-        g: (colorA.g - colorB.g) / duration,
-        b: (colorA.b - colorB.b) / duration
+        r: (colorB.r - colorA.r) / duration,
+        g: (colorB.g - colorA.g) / duration,
+        b: (colorB.b - colorA.b) / duration
     }
 
     // Calculate the new value by offsetting

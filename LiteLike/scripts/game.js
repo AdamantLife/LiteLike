@@ -245,7 +245,6 @@ class GameplaySequence{
         // remove items from it that have already been achieved
         this.UNLOCKTREE = {
             "sector":{
-
             },
             "unlock":{
                 [unlocks.SECTORS]:{
@@ -253,7 +252,6 @@ class GameplaySequence{
                 }
             },
             "resource":{
-
             },
         }
         this.initialSetup();
@@ -268,12 +266,14 @@ class GameplaySequence{
             "plm": this.firstPower.bind(this),
             "ua": (event)=>this.checkState(event, "unlock"),
             "sa": (event)=>this.checkState(event, "sector"),
-            "r": (event)=>this.checkState(event, "resource")
+            "rp": (event)=>this.checkState(event, "resource"),
+            "rc": (event)=>this.checkState(event, "resource")
         };
         this.game.COLONY.addEventListener("powerlevelmodified", this.listeners.plm);
         this.game.COLONY.addEventListener("unlockadded", this.listeners.ua);
         this.game.COLONY.addEventListener("sectoradded", this.listeners.sa);
-        this.game.PLAYER.addEventListener("resourcesmodified", this.listeners.r);
+        this.game.COLONY.addEventListener("resourcesmodified", this.listeners.rc);
+        this.game.PLAYER.addEventListener("resourcesmodified", this.listeners.rp);
     }
 
     /**
@@ -375,7 +375,7 @@ class GameplaySequence{
                 break;
             case "equipmentchange":
                 sender = this.game.PLAYER;
-                callback = this.listeners.r;
+                callback = this.listeners.rp;
                 break;
         }
         // No such sender

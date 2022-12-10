@@ -149,7 +149,7 @@ export class TheColonyGUI{
         let costString = `${this.translate(STRINGS.COST)}:`;
         if(!requirements.length) return costString + ` ${this.game.UI.translate(this.game.UI.STRINGS.NONE)}`;
         for(let [resource, qty] of requirements){
-            let resourceString = getStrings(this.game.STRINGS, resource);
+            let resourceString = getStrings(this.game.STRINGS, this.game.ITEMS.resources[resource]);
             costString += `
     ${resourceString.name}: ${qty}`;
             }
