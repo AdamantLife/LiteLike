@@ -31,7 +31,7 @@ body>*{
 
 .statusbox>.body{
     width:25vw;
-    height:50vh;
+    height:25vh;
     background-color: white;
     border: solid;
     border-top: none;
@@ -42,7 +42,7 @@ body>*{
 }
 
 .statusbox>.body.hidden{
-    height:0vh;
+    height:0vh !important;
     animation: statusclose;
     animation-duration: 250ms;
     animation-timing-function: ease-out;
@@ -90,10 +90,11 @@ body>*{
     }
 
 .fadeoutmask{
-    position: relative;
+    position: absolute;
     width:100%;
-    top: 75%;
-    height:25%;
+    height:30%;
+    bottom:0%;
+    margin-bottom: 10px;
     background: rgb(255,255,255);
     background: linear-gradient(180deg,rgb(255,255,255,0) 0%, rgb(255,255,255,0.5) 50%,rgb(255,255,255,1) 100%);
 }
@@ -103,12 +104,38 @@ body>*{
     color: white;
 }
 
-#resourcebox>.header{
+#messagebox ul{
+    list-style-type: none;
+    
+}
+#messagebox ul>li{
+    margin-bottom: 1em;
+    text-indent: -1em;
+    margin-left: 1em;
+}
+
+#messagebox>.body{
+    height:50vh;
+}
+
+#resourcesbox>.header{
     background-color: coral;
     color: white;
 }
+#itemsbox>.header{
+    background-color: #f6ff66;
+}
+#weaponsbox>.header{
+    background-color: #9cff7d;
+}
+
 
 /** HOME PAGES */
+#homecontent>div{
+    overflow: hidden;
+    width:100%;
+}
+
 /** NAVBAR */
 #homenavbar>*{
     margin-right: 1em;
@@ -124,6 +151,14 @@ body>*{
 #adminPage fieldset{
     width:50%;
     height:100%;
+    padding-bottom: 30px;
+}
+
+#adminPage fieldset tbody>tr{
+    width:100%;
+}
+#adminPage fieldset tbody>tr>td:first-of-type{
+    width:100%;
 }
 
 #adminPage>div{
@@ -143,6 +178,64 @@ body>*{
 #sectorsPage td.task.collect div.progressbar{
     display: none;
 }
+
+/** MEEPLE */
+#meeplePage{
+    display: inline-flex;
+}
+
+#meeplePage>fieldset{
+    width:50%;
+}
+
+#jobtable td.plusmeeple::after{
+    content:"\25B2";
+}
+    #jobtable td.plusmeeple.disabled{
+        color: lightgray;
+    }
+
+#jobtable td.minusmeeple::after{
+    content:"\25BC";
+}
+    #jobtable td.minusmeeple.disabled{
+        color: lightgray;
+    }
+
+#incometable td:first-of-type{
+    width:100%;
+}
+#incometable td:last-of-type{
+    text-align: right;
+}
+
+#incometable td.income{
+    position: relative;
+}
+
+#incometable td.income>table{
+    position:fixed;
+    transform:translateX(-100%);
+    z-index: 100;
+    display: none;
+    background-color: white;
+    border-style: outset;
+    white-space:nowrap;
+}
+    #incometable td.income:hover>table{
+        display: block;
+    }
+
+    #incometable td.income>table tr.total{
+        font-weight: bold;
+    }
+        #incometable td.income>table tr.total>td:nth-of-type(2){
+            border-top: 2px solid black;
+        }
+
+    #incometable td.income>table td{
+        padding-left: 1em;
+    }
 
 /**        EVENTS          */
 #events{

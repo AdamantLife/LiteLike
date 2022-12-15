@@ -173,3 +173,24 @@ export function calcColorTransition(colorA, colorB, duration, attime){
     event.target.style.backgroundColor = "revert-layer";
     event.target.style.transitionDuration = "";
 }
+
+/**
+ * Resorts all rows in a table body
+ * @param {Element} tablebody - The tbody to resort
+ * @param {Function} [compareFN=idSort] - An optional comparison function to use for the sort.
+ *      The default idSort is a function which compares dataset.id as integers
+ */
+export function sortTableBody(tablebody, compareFN=null){
+    // The default compareFN sorts each row by its data-id value, parsing the value as an Integer
+    if(!compareFN) compareFN = (a,b)=>parseInt(a.dataset.id) - parseInt(b.dataset.id);
+
+    // Get rows
+    let rows = [... tablebody.children];
+    // Sort the,
+    rows.sort(compareFN);
+    // Remove each row and reappend it in order to reorder the tbody
+    for(let row of rows){
+        row.remove();
+        tablebody.append(row);
+    }
+}

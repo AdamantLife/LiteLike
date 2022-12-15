@@ -7,7 +7,9 @@ export class GameGUI{
     // Generic Translations
     STRINGS = enumerate(
         // None
-        "NONE"
+        "NONE",
+        // Equipment Types
+        "RESOURCES", "ITEMS", "WEAPONS", "ARMOR", "TRANSPORTS"
     )
 
     constructor(game){
@@ -24,7 +26,7 @@ export class GameGUI{
     get homecontent(){ return document.getElementById("homecontent"); }
     
     setupUI(){
-        document.body.insertAdjacentHTML("beforeend", `<div id="statuspanel"></div><div id="home" style="width:100%;height:75vh;"><div id="homenavbar"></div><hr /><div id="homecontent" style="height:100%;"></div></div>`);
+        document.body.insertAdjacentHTML("beforeend", `<div id="statuspanel"></div><div id="home" style="width:100%;height:75vh;"><div id="homenavbar"></div><hr /><div id="homecontent"></div></div>`);
     }
 
     /**
@@ -34,9 +36,13 @@ export class GameGUI{
      * @returns {Element} - The created button. This can be used to immediately activate the page via setPage
      */
     registerPage(id, displayname){
+        // Add to navbar
         this.homenavbar.insertAdjacentHTML("beforeend", `<button id="${id}">${displayname}</button>`);
         let button = this.homenavbar.lastElementChild;
+        // Hookup button to show page
         button.onclick = ()=>this.setPage(button);
+        // Make sure page is hidden
+        this.homecontent.querySelector(`#${id}Page`).style.height = "0px";
         return button;
     }
     /**
@@ -52,11 +58,11 @@ export class GameGUI{
         // Reenable all buttons
         for(let button of this.homenavbar.children) button.disabled = false;
         // Hide all pages
-        for(let div of this.homecontent.children) div.style.display = "none";
+        for(let div of this.homecontent.children) div.style.height = "0px";
         // Disable Button
         button.disabled = true;
         // Show correct page
-        document.getElementById(pageid).style.display = "block";
+        document.getElementById(pageid).style.height = "100%";
     }
 
 }

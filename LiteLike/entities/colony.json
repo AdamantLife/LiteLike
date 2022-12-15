@@ -5,20 +5,22 @@
             "prerequisites":[],
             "maxLevel": 3,
             "resourcesRequired":[
-                [2, 10]
+                [2, 5]
             ],
             "flags":[],
-            "collectionTime":30000
+            "collectionTime":15000,
+            "autofreeze":true
         },
         {
             "sectorType":"RESIDENTIAL",
             "prerequisites":[],
             "maxLevel":10,
             "resourcesRequired":[
-                [1, 15]
+                [1, 5]
             ],
             "flags":[],
-            "collectionTime":5000
+            "collectionTime":5000,
+            "autofreeze":false
         },
         {
             "sectorType": "SCOUTBOTS",
@@ -29,7 +31,8 @@
                 [2, 20]
             ],
             "flags":[],
-            "collectionTime": 5000
+            "collectionTime": 5000,
+            "autofreeze":true
         },
         {
             "sectorType": "AGRICULTURE",
@@ -39,8 +42,9 @@
                 [1, 10],
                 [2, 10]
             ],
-            "flags":["AGRICULTURE"],
-            "collectionTime": 10000
+            "flags":[],
+            "collectionTime": 10000,
+            "autofreeze":true
         }
     ],
     "job":[
@@ -49,12 +53,13 @@
                 [0, 1]],
             "resourcesRequired":[],
             "collectionTime": 5000,
-            "prerequisites": ["AGRICULTURE"]
+            "prerequisites": []
         },
         {
             "resourcesGenerated": [[1, 5]],
             "resourcesRequired":[],
-            "collectionTime": 5000
+            "collectionTime": 5000,
+            "prerequisites":["CHARGING"]
         }
     ]
 }

@@ -138,16 +138,22 @@
     ],
     "ui":{
         "game":[
-            "None"
+            "None",
+            "Resources",
+            "Items",
+            "Weapons",
+            "Armor",
+            "Transports"
         ],
         "colony":[
-            "Resources",
             "Requires",
             "Sectors",
+            "Population",
             "Replace Batteries",
             "Residents",
             "Sectors",
-            "Construct",
+            "Trade",
+            "Exchange",
             "Dark",
             "Shadowy",
             "Dim",
@@ -166,7 +172,9 @@
             "Repair",
             "Expand",
             "Maximum Efficiency",
-            "Collect"
+            "Collect",
+            "Jobs",
+            "Income"
         ],
         "messagelog":[
             "System Log",
@@ -180,9 +188,12 @@
 
         ],
         "gameplay":[
-            "With your mech badly damaged, you seek refuge within a dark shell.",
-            "The dark shell sputters as the new batteries resuscitate it",
-            "Looking around the hull in the dim light, you spot a salvaging rig. You think you can get it working with the scrap you have."
+            "With your mech badly damaged, you seek refuge within a Dark Shell.",
+            "The Dark Shell sputters as the new batteries resuscitate it",
+            "Looking around the hull in the dim light, you spot a salvaging rig. You think you can get it working with the scrap you have.",
+            "Having noticed activity in the Shell, a local Trader stops by and offers to barter with you in the future.",
+            "The Shell is much larger than you first realized. It looks like it would be a very productive hub if you could power additional sectors.",
+            "A recently-arrived immigrant says he's familiar with the engineering behind the ${population}'s Battery Charging Room and volunteers to fix it so other residents can operate it."
         ]
     }
 }

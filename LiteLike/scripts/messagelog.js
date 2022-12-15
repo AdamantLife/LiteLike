@@ -45,7 +45,7 @@ export class MessageLog{
         // In case the Home Page hasn't populated yet
         let statpanel = this.game.UI.statuspanel;
         // Setup UI
-        statpanel.insertAdjacentHTML("afterbegin", `<div id="messagebox" class="statusbox"><div class="header">${this.translate(STRINGS.SYSTEMLOG)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><div class="fadeoutmask"></div></div></div>`);
+        statpanel.insertAdjacentHTML("afterbegin", `<div id="messagebox" class="statusbox"><div class="header">${this.translate(STRINGS.SYSTEMLOG)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><ul></ul><div class="fadeoutmask"></div></div></div>`);
         // Setup messagebox hide/show
         SITEGUI.attachPanelResizeCallback(document.getElementById("messagebox"));
     }
@@ -66,7 +66,7 @@ export class MessageLog{
      */
     addMessage(message, notification = null){
         // Add message line to messageboxbody
-        document.querySelector("#messagebox>.body").insertAdjacentHTML('afterbegin', `<ul>${message}</ul>`);
+        document.querySelector("#messagebox>.body>ul").insertAdjacentHTML('afterbegin', `<li>${message}</li>`);
         // No notifcation flash
         if(!notification) return;
 
@@ -90,7 +90,7 @@ export class MessageLog{
         if(!backgroundColor) return;
 
         // Flash the line item
-        SITEGUI.flashText(document.querySelector("#messagebox>.body").firstElementChild, {color: "white", backgroundColor, duration: 1000, iterations: 1});
+        SITEGUI.flashText(document.querySelector("#messagebox>.body li:first-of-type"), {color: "white", backgroundColor, duration: 1000, iterations: 1});
         // Flash the header too in case the messagebox is collapsed
         SITEGUI.flashText(document.querySelector("#messagebox>.header"), {color: "white", backgroundColor, duration:1000, iterations: 1});
     }

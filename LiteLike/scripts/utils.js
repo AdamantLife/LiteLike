@@ -431,3 +431,11 @@ export class Timer {
         this.startTime = now - (offset % this.rate) - (this.cycles * this.rate);
     }
 }
+
+/**
+ * Takes a cost array (which has positive qty) and converts its qty's to negative
+ * @param {Resource[]} cost - The cost array to invert
+ */
+export function invertCost(cost){
+    return cost.map(([resource,qty])=>[resource, -qty]);
+}

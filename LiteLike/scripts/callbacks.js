@@ -33,10 +33,11 @@ export const itemCallbacks = Object.freeze({HEAL:heal });
  * @param {seedrandom} random - The Game instance's seedrandom
  */
 function scrap(sector, colony, random){
+    let gain = sector.level * 20
     // Add resources to TheColony
-    colony.addResource(2, sector.level * 5);
+    colony.addResource(2, gain);
     // Let listeners know that resources have been changed
-    colony.triggerEvent(COLONY.TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [ [2, sector.level * 5]]});
+    colony.triggerEvent(COLONY.TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [ [2, gain]]});
 }
 
 /**

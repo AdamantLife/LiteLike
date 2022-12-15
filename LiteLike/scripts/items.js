@@ -32,7 +32,7 @@ class ShopItem {
     /**
      * 
      * @param {Symbol[] | undefined} shopPrerequisites - Unlocks required to purchase from shop
-     * @param {Resource[]} shopCost - Cost to 
+     * @param {Resource[]} shopCost - Cost to purchase from shop
      */
     constructor(shopPrerequisites, shopCost){
         this.shopPrerequisites = shopPrerequisites;
@@ -40,7 +40,47 @@ class ShopItem {
     }
     /** Converts the shopCost from positive quantities to negative quantities */
     get invertedShopCost(){
-        return this.shopCost.map(([resource,qty])=>[resource, -qty]);
+        return UTILS.invertCost(this.shopCost);
+    }
+
+    /**
+     * Checks if The Colony meets all prerequisites and has discovered the required Resources.
+     * Note that this is different from isPurchaseable as it doesn't check if The Colony can
+     * actually cover the cost of the ShopItem
+     * @param {TheColony} colony - TheColony to compare cost and prerequisites to
+     */
+    isAvailable(colony){
+        // Item cannot be purchased (probably because it's a monster's item)
+        if(!this.shopPrerequisites) return false;
+        // Check shopPrereqs
+        for(let unlock of this.shopPrerequisites){
+            // If colony does not have the unlock, is not available
+            // Note that checkUnlocks returns a list of invalid unlocks
+            if(colony.checkUnlocks(unlock).length) return false;
+        }
+        // Check that colony has discovered all the required resources
+        for(let [res, qty] of this.shopCost){
+            // TheColony has not discovered that resource yet
+            if(typeof colony.getResource(res) == "undefined") return false;
+        }
+        return true;
+    }
+
+    /**
+     * Checks if The Colony meets all prerequisites and currently possessed the required
+     * Resources in order to complete a purchase
+     * @param {TheColony} colony - TheColony to compare cost and prerequisites to
+     */
+     isPurchaseable(colony){
+        // Check shopPrereqs
+        for(let unlock of this.shopPrerequisites){
+            // If colony does not have the unlock, is not available
+            // Note that checkUnlocks returns a list of invalid unlocks
+            if(colony.checkUnlock(unlock).length) return false;
+        }
+        // So long as unlocks are ok, we can use TheColony's checkCost
+        // function to make sure it has enough resources to purchase
+        return colony.checkCost(this.shopCost);
     }
 }
 
