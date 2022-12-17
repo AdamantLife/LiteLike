@@ -43,7 +43,7 @@ export class MessageLog{
      */
     setupUI(){
         // In case the Home Page hasn't populated yet
-        let statpanel = this.game.UI.statuspanel;
+        let statpanel = this.game.COLONY.ui.statuspanel;
         // Setup UI
         statpanel.insertAdjacentHTML("afterbegin", `<div id="messagebox" class="statusbox"><div class="header">${this.translate(STRINGS.SYSTEMLOG)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><ul></ul><div class="fadeoutmask"></div></div></div>`);
         // Setup messagebox hide/show

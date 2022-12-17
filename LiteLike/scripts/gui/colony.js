@@ -2,7 +2,7 @@
 import * as SITEGUI from "./site.js";
 import { getStrings, makeTranslationLookup } from "../io.js";
 import { MAXPOWER, sectors, TheColony } from "../colony.js";
-import { enumerate} from "../utils.js";
+import { enumerate, invertCost} from "../utils.js";
 
 /** DEVNOTE- this list needs to be maintained alongside the LANGUAGE jsons */
 const STRINGS = enumerate(
@@ -45,6 +45,9 @@ export class TheColonyGUI{
 
         this.translate = makeTranslationLookup(this.colony.game, STRINGS, "colony");
 
+        this.pages = [];
+        this.currentpage = null;
+
         this.colony.addEventListener("powerlevelmodified", this.updatePowerLevel.bind(this));
         this.colony.addEventListener("resourcesmodified", this.updateStatusbox.bind(this));
         // These are bound in setupShop, but noted here for reference
@@ -64,18 +67,83 @@ export class TheColonyGUI{
     }
 
     get game() {return this.colony.game;}
+    get statuspanel(){ return document.getElementById("statuspanel"); }
+    get homepanel(){ return document.getElementById("home"); }
+    get homenavbar(){ return document.getElementById("homenavbar"); }
+    get homecontent(){ return document.getElementById("homecontent"); }
+
+    /**
+     * Creates a Button in Home's navigation bar with displayname as its text. When selected the button will show the page with id `${id}Page`.
+     * @param {String} id - The id to apply to the Button
+     * @param {String} displayname - The Button's text
+     * @returns {Element} - The created button. This can be used to immediately activate the page via setPage
+     */
+    registerPage(id, displayname){
+        // Add to navbar
+        this.homenavbar.insertAdjacentHTML("beforeend", `<button id="${id}">${displayname}</button>`);
+        let button = this.homenavbar.lastElementChild;
+        // Hookup button to show page
+        button.onclick = ()=>this.setPage(button);
+        // Make sure page is hidden
+        this.homecontent.querySelector(`#${id}Page`).style.height = "0px";
+        return button;
+    }
+    /**
+     * Callback for Home Page Buttons: swaps the currently displayed page to the selected one.
+     * Register Page is used to setup this callback
+     * Adapted from colonydemo
+     * 
+     * @param {Element} button - The button pressed
+     */
+    setPage(button){
+        this.currentpage = button.id;
+        let pageid = button.id+"Page";
+        // Reenable all buttons
+        for(let button of this.homenavbar.children) button.disabled = false;
+        // Hide all pages
+        for(let div of this.homecontent.children) div.style.height = "0px";
+        // Disable Button
+        button.disabled = true;
+        // Show correct page
+        document.getElementById(pageid).style.height = "100%";
+    }
 
     /**
      * Populates the screen with the baseline UI Elements for TheColony
      */
     setupUI(){
-        let statpanel = this.game.UI.statuspanel;
+        this.game.UI.gamewindow.insertAdjacentHTML("beforeend", `
+<div id="statuspanel"></div>
+<div id="home" style="width:100%;height:75vh;"><div id="homenavbar"></div><hr /><div id="homecontent"></div></div>
+<div id="gamemenu">
+    <svg viewBox="0 0 20 15" preserveAspectRatio="none">
+        <defs>
+            <linearGradient id="grip" gradientTransform="rotate(90 0.5 0.5)" gradientUnits="objectBoundingBox">
+                <stop offset="0" stop-color="rgb(0, 10, 50)" />
+                <stop offset="0.5" stop-color="rgb(0, 40, 125)" />
+                <stop offset="1" stop-color="rgb(0, 75, 255)" />
+            </linearGradient>
+        </defs>
+
+        <rect y="0" width="20" height="5" fill="url('#grip')"/>
+        <rect y="5" width="20" height="5" fill="url('#grip')"/>
+        <rect y="10" width="20" height="5" fill="url('#grip')"/>
+    </svg>
+    <div>
+        <button id="savegame">${this.game.UI.translate(this.game.UI.STRINGS.SAVE)}</button>
+        <button id="quitgame">${this.game.UI.translate(this.game.UI.STRINGS.QUIT)}</button>
+    </div>
+</div>`);
+
+        document.getElementById("quitgame").onclick = this.game.UI.exitToMainMenu.bind(this.game.UI);
+        document.getElementById("savegame").onclick = this.game.UI.saveGame.bind(this.game.UI);
+        let statpanel = this.statuspanel;
         // Create Resource Panel
         statpanel.insertAdjacentHTML('beforeend', `<div id="resourcesbox" class="statusbox"><div class="header">${this.game.UI.translate(this.game.UI.STRINGS.RESOURCES)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><table class="boldfirst quantitytable"><tbody></tbody></table></div></div>`)
         // Setup resourcebox hide/show
         SITEGUI.attachPanelResizeCallback(document.getElementById("resourcesbox"));
 
-        let home = this.game.UI.homecontent;
+        let home = this.homecontent;
         // Setup Home Content: we initially setup for a brand new game, and can update later if
         // loading from a save file
         home.insertAdjacentHTML('beforeend', `
@@ -107,8 +175,8 @@ export class TheColonyGUI{
 
 
         // Register page on Home
-        let button = this.game.UI.registerPage("admin","");
-        this.game.UI.setPage(button);
+        let button = this.registerPage("admin","");
+        this.setPage(button);
 
         // Prepopulate Resources Panel
         // DEVNOTE- updateStatusbox checks for eventtype and resourcechange on the object it recieves
@@ -133,22 +201,28 @@ export class TheColonyGUI{
         this.updatePowerLevel({powerlevel:this.colony.powerLevel});
 
         // If The Colony has Sectors unlocked, set it up
-        if(!this.colony.checkUnlocks("SECTORS").length) this.setupSectors();
+        if(!this.colony.checkUnlocks(["SECTORS"]).length) this.setupSectors();
         // If the Gampeplaysequence has the Shop unlocked, set it up
-        if(!this.game.GAMEPLAYSEQUENCE.checkFlags("SHOP").length) this.setupShop();
+        if(!this.game.GAMEPLAYSEQUENCE.checkFlags(["SHOP"]).length) this.setupShop();
         // If The Colony has the Residential Sector unlocked, set it up
         if(this.colony.sectors.indexOf(sectors.RESIDENTIAL) >= 0) this.setupMeeple();
     }
 
     setupSectors(){
-        let home = this.game.UI.homecontent;
+        let home = this.homecontent;
         home.insertAdjacentHTML('beforeend', `<div id="sectorsPage"><table><tbody id="sectortable"></tbody></table></div>`);
-        this.game.UI.registerPage("sectors", this.translate(STRINGS.SECTORPAGE));
+        this.registerPage("sectors", this.translate(STRINGS.SECTORPAGE));
+
+        // Sectors are added individually
+        for(let sector of this.colony.sectors){
+            // Spoofing the sectoradded event
+            this.addSector({sector});
+        }
     }
 
     setupShop(){
         // Add Items and Weapons to the sidebar
-        let statpanel = this.game.UI.statuspanel;
+        let statpanel = this.statuspanel;
         // Create Resource Panel
         statpanel.insertAdjacentHTML('beforeend', `<div id="itemsbox" class="statusbox"><div class="header">${this.game.UI.translate(this.game.UI.STRINGS.ITEMS)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><table class="boldfirst quantitytable"><tbody></tbody></table></div></div>`)
         // Setup resourcebox hide/show
@@ -223,9 +297,9 @@ export class TheColonyGUI{
         ${this.translate(STRINGS.RESIDENTS)}: <span id="population"></span>
     </div>`);
 
-        let home = this.game.UI.homecontent;
+        let home = this.homecontent;
         home.insertAdjacentHTML('beforeend', `<div id="meeplePage"><fieldset><legend>${this.translate(STRINGS.JOBS)}</legend><table><tbody id="jobtable"></tbody></table></fieldset><fieldset><legend>${this.translate(STRINGS.INCOME)}</legend><table><tbody id="incometable"></tbody></table></fieldset></div>`);
-        this.game.UI.registerPage("meeple", this.translate(STRINGS.MEEPLEPAGE));
+        this.registerPage("meeple", this.translate(STRINGS.MEEPLEPAGE));
 
         // Setup callback for Job management arrows
         // DEVNOTE- Due to the number of arrows per job and the potential number of jobs
@@ -245,7 +319,7 @@ export class TheColonyGUI{
         //      manipulates the job and income tables
         this.updateJobsAvailable({});
         // Spoofing a meeplemodified event in order to prepopulate the population span
-        this.updateMeeple({newmeeple:this.colony.meeples.length});
+        this.updateMeeple({newmeeple:this.colony.meeples});
     }
 
     /**
@@ -618,7 +692,7 @@ export class TheColonyGUI{
         // Required needs to be inverted as it is subtracting from the income
         for(let [resource, rqty] of [
             ... job.resourcesGenerated,
-            ... job.resourcesRequired.map(([resource, qty])=>[resource, -qty])
+            ... invertCost(job.resourcesRequired)
         ]){
             // The income rate is displayed per-10 second interval, so we need to convert
             // the job's resource-qty-per-cycle to match. collectionTime is in ms, so we'll
@@ -631,7 +705,7 @@ export class TheColonyGUI{
             // Note that qty here is qty of meeple
             let newRate = parseFloat(ratespan.innerText) + (rate * qty);
             // Show sign of number on span
-            ratespan.innerText = newRate >= 0 ? "+"+newRate : "-"+newRate;
+            ratespan.innerText = newRate >= 0 ? "+"+newRate : newRate;
             
             // We need to recalculate resourcerow's total once we're done going through all the jobs
             if(updateincometotals.indexOf(resourcerow) < 0) updateincometotals.push(resourcerow);
@@ -665,7 +739,7 @@ export class TheColonyGUI{
             }
             // Set new total rate
             // Since we have to apply the sign to both elements, only convert to string once
-            rate = rate >= 0 ? "+"+rate : "-"+rate;
+            rate = rate >= 0 ? "+"+rate : rate;
             totalspan.innerText = rate;
             breakdowntotalspan.innerText = rate;
         }
@@ -840,6 +914,8 @@ export class TheColonyGUI{
             progressbar.style.backgroundColor = SITEGUI.calcColorTransition("#ffff00", "ff0000",sector.timer.rate, progress);
             // Set transition duration to match remaining timte
             progressbar.style.transitionDuration = remaining+"ms";
+            // Make sure transition is linear (defaults to ease-out)
+            progressbar.style.transitionTimingFunction = "linear";
             // Set animation callback to clear all these duration and manually swap 
             let callback = (event)=>{progressbar.removeEventListener("transitionend", callback); SITEGUI.clearPartialProgress(event); changecallback(event);}
             progressbar.addEventListener("transitionend", callback);

@@ -78,7 +78,14 @@ export class TheColony extends UTILS.EventListener{
 
         this.sectors = Array.from(sectors);
 
-        this.unlocks = Array.from(unlocks);
+        this.unlocks = [];
+        let result;
+        for(let unlock of unlocks){
+            [unlock, result] = this.validateUnlock(unlock);
+            // result is whether The Colony has the Unlock
+            // So if it doesn't (!result) we can add it
+            if(!result) this.unlocks.push(unlock);
+        }
 
         // TheColony has its own Storage
         this.storage = {weapons:[], items:[], resources:[]};
@@ -403,6 +410,13 @@ export class TheColony extends UTILS.EventListener{
         this.triggerEvent(TheColony.EVENTTYPES.sectoradded, {sector});
 
         return sector;
+    }
+
+    /**
+     * Very simply cancels the timeout for colonyLoop
+     */
+    clearLoop(){
+        window.clearTimeout(this.loopid);
     }
 
     /**
@@ -786,7 +800,7 @@ export class TheColony extends UTILS.EventListener{
         // Filter meeple by job
         let meeple = this.meeples.filter((meeple)=>meeple.job == job);
         // Sort meeple based on time remaining on their timer
-        meeple.sort((meepleA, meepleB)=> meepleA.jobTimer.remaining(_now) - meepleB.jobTimer.remaining(_now));
+        meeple.sort((meepleA, meepleB)=> meepleB.jobTimer.remaining(_now) - meepleA.jobTimer.remaining(_now));
         // return the sorted array
         return meeple;
     }
@@ -840,7 +854,7 @@ export class TheColony extends UTILS.EventListener{
 /**
  * A worker on the Home Base
  */
-class Meeple{
+export class Meeple{
 
     /**
      * @param {Job} job - The Job that the Meeple is current performing
@@ -887,12 +901,13 @@ class Meeple{
 export class Job{
     /**
      * 
+     * @param {Number} id - The Job's ID
      * @param {Array} resourcesGenerated - An object of resource ID's generated and their quantities
      * @param {Array} resourcesRequired - An object of resource ID's required and their quantities
      * @param {Number} collectionTime - Amount of millis it takes to complete the job
      */
-    constructor(resourcesGenerated, resourcesRequired, collectionTime){
-        // TODO: IO automatically assigns job.id, should probably formalize it
+    constructor(id, resourcesGenerated, resourcesRequired, collectionTime){
+        this.id = id;
         this.resourcesGenerated = resourcesGenerated;
         this.resourcesRequired = resourcesRequired;
         this.collectionTime = collectionTime;

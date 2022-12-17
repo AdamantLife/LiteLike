@@ -60,6 +60,8 @@ export class Combat extends UTILS.EventListener{
         // This is a post-combat time period where the
         // player can still activate items before combat is over
         this.lockout = false;
+
+        this.loop;
     }
 
     getDefaultEventData(){
@@ -143,7 +145,7 @@ export class Combat extends UTILS.EventListener{
         this.triggerEvent(Combat.EVENTTYPES.endloop);
 
         // Set next timeout
-        window.setTimeout(this.combatLoop.bind(this), UTILS.LOOPRATE);
+        this.loop = window.setTimeout(this.combatLoop.bind(this), UTILS.LOOPRATE);
     }
 
     /**
@@ -303,12 +305,17 @@ export class Combat extends UTILS.EventListener{
         this.lockout = true;
         this.resolveCombat();
     }
+
     /**
      * Cleans up combat
      */
     resolveCombat(){
+        // Make sure to clear timeout just incase
+        window.clearTimeout(this.loop);
         // Notify listeners of end of combat
         this.triggerEvent(Combat.EVENTTYPES.endcombat);
-        //TODO
+        // Clear listeners as we should be on our way to being destroyed
+        this.removeAllListeners();
+        this.enemy.removeAllListeners();
     }
 }

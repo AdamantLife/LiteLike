@@ -143,7 +143,11 @@
             "Items",
             "Weapons",
             "Armor",
-            "Transports"
+            "Transports",
+            "Play",
+            "Save",
+            "Load Game",
+            "Quit"
         ],
         "colony":[
             "Requires",

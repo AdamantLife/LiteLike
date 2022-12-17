@@ -1,9 +1,14 @@
 "use strict";
+import * as GAME from "./game.js";
+import * as MAP from "./map.js";
 import * as EQUIP from "./items.js";
 import * as COLONY from "./colony.js";
-import * as CHARACTER from "./character.js"
+import * as CHARACTER from "./character.js";
+import * as UTILS from "./utils.js";
+import { MessageLog } from "./messagelog.js";
 import {instanceFromJSON} from "./utils.js";
 import {itemCallbacks} from "./callbacks.js";
+
 
 /**
  * Most objects can be created directly from the provided json dict.
@@ -139,6 +144,190 @@ export function loadEncounters(){
 }
 
 /**
+ * Save the current gamestate to a file and immediately downloads that file
+ * @param {Game} game - The game to save
+ */
+export function saveFile(game){
+    let now = UTILS.now();
+
+    // The object that will store all our data
+    let output= {};
+
+    // Saving Game RNG
+    // DEVNOTE- this helps prevent save scumming/exploits (ymmv if that is good)
+    output.state = game.random.state();
+
+    // Record GameplaySequence info
+    output.gameplay = {};
+    output.gameplay.flags = game.GAMEPLAYSEQUENCE.flags.map(flag=>flag.description);
+
+    // Record Map
+    output.map = {};
+    output.map.seed = game.MAP.seed;
+    output.map.mask = game.MAP.mask;
+    // DEVNOTE- we do not save Map.playerLocation because the game can only be saved in The Colony
+    //      and always initializes from The Colony
+
+    // Record Colony info
+    output.colony = {};
+    output.colony.powerLevel = game.COLONY.powerLevel;
+    output.colony.unlocks = game.COLONY.unlocks.map(unlock=>unlock.description);
+    output.colony.sectors = [];
+    for(let sector of game.COLONY.sectors){
+        // Saving sectorType, level, timer offsetTime and isReady so the timer can be reloaded in the same state
+        // DEVNOTE- We are not currently saving sector cycles, but could in the future if we care about longterm stats
+        output.colony.sectors.push([sector.sectorType.description, sector.level, sector.timer.getOffsetTime(now), sector.timer.isReady]);
+    }
+    output.colony.storage = {resources:[], items:[], weapons:[]};
+    // All of this gets saved the same way
+    for(let [outstorage,colonystorage] of [
+        [output.colony.storage.resources, game.COLONY.resources],
+        [output.colony.storage.items, game.COLONY.items],
+        [output.colony.storage.weapons, game.COLONY.weapons],
+    ]){
+        for(let i = 0; i < colonystorage.length; i++){
+            // If the colony has the item, then its id and quantity saved as a length-2 array
+            if(colonystorage[i] !== null && typeof colonystorage[i] !== "undefined") outstorage.push([i,colonystorage[i]]);
+        }
+    }
+    output.colony.meeples = [];
+    // Saving meeple job, jobTimer.getOffsetTime, and hungerTimer.getOffsetTime in order to restore state
+    // DEVNOTE- As with sectors, we currently do not care about longterm statistics
+    // and therefore are only saving the essentials
+    for(let meeple of game.COLONY.meeples){
+        output.colony.meeples.push([meeple.job.id, meeple.jobTimer.getOffsetTime(now), meeple.hungerTimer.getOffsetTime(now)]);
+    }
+
+    // Record Player info
+    output.player = {};
+    // DEVNOTE- We currently are not saving id or roles because at the moment those never change
+    output.player.statistics = game.PLAYER.statistics;
+    output.player.equipment = {resources:[], items:[], weapons:[],
+        // For armor and transport, we are only saving ID as they are singleton
+        // Per DEVNOTES, the Player will always load the save into The Colony, so we don't
+        //      need the transport's current fuel
+        armor:game.PLAYER.armor ?  game.PLAYER.armor.id : game.PLAYER.armor,
+        transport: game.PLAYER.transport ? game.PLAYER.transport.id : game.PLAYER.transport
+    }
+    // For resources and items, the only thing we need to save is id and quantity
+    for(let [outputstorage, playerstorage] of [
+        [output.player.equipment.resources, game.PLAYER.resources],
+        [output.player.equipment.items, game.PLAYER.items]
+    ]){
+        for(let obj of playerstorage){
+            outputstorage.push([obj.type.id, obj.quantity]);
+        }
+    }
+    // For weapons, we're just saving the weapontype id
+    for(let weapon of game.PLAYER.weapons) output.player.equipment.weapons.push(weapon.type.id);
+
+    // DEVNOTE- we do not save Game.ENCOUNTER because the game can only be saved in The Colony
+    //      and always initializes from The Colony
+        
+
+    // Create hyperlink element
+    // The link's href value is our json file stringified and encoded as a data uri
+    // the file name is the download attribute
+    document.body.insertAdjacentHTML("beforeend", `
+<a
+    href="data:text/plain;charset=utf-8,${encodeURIComponent(JSON.stringify(output))}"
+    download="litelikesave.json"
+    style="display:none;"
+    ></a>`);
+    // Clicking on the link begins the download
+    document.body.lastElementChild.click();
+    // Then just remove the element when we're done
+    document.body.lastElementChild.remove();
+}
+
+/**
+ * Loads a game from the given save file
+ * @param {File} file - The save file
+ */
+export function loadSave(file){
+    /**
+     * After the file has been loaded and parsed to JSON, a new game is
+     * created within a promise (because Game loads data asynchronously)
+     * @param {Object} savedata - The parsed json data of the file
+     * @param {Promise} - A promise for when all the data has been loaded and parsed
+     */
+    function load(savedata){
+        /**
+         * The Promise function
+         * When this is complete, it will return the newly-created game object
+         */
+        function loadData(resolve, error){
+            let game;
+            let now = UTILS.now();
+        
+            game = new GAME.Game(savedata.state);
+            game.loadData().then((game)=>{
+                let player, colony, map, gameplay, messagelog;
+
+                
+                player = new CHARACTER.PlayerCharacter(0, [CHARACTER.roles.CHARACTER, CHARACTER.roles.PLAYER],
+                    savedata.player.statistics,
+                    savedata.player.equipment
+                    );
+        
+                
+                    let sectors = [];
+                for(let [sectorType, level, offset, ready] of savedata.colony.sectors){
+                    let sector = game.SECTORS[COLONY.sectors[sectorType]];
+                    sector.level = level;
+                    sector.newTimer(now);
+                    sector.timer.setOffsetTime(now, offset);
+                    if(ready) sector.timer.setReady();
+                    sectors.push(sector);
+                }
+
+                let meeples = [];
+                for(let [jobId, jobOffset, hungerOffset] of savedata.colony.meeples){
+                    let meeple = new COLONY.Meeple(game.getJobById(jobId), now, now);
+                    meeple.jobTimer.setOffsetTime(now, jobOffset);
+                    meeple.hungerTimer.setOffsetTime(now, hungerOffset);
+                    meeples.push(meeple);
+                }
+
+                colony = new COLONY.TheColony(game, savedata.colony.powerLevel,
+                    sectors,
+                    savedata.colony.unlocks,
+                    savedata.colony.storage,
+                    meeples
+                );
+
+                
+                map = new MAP.Map(savedata.map.seed, savedata.map.mask);
+
+                game.PLAYER = player;
+                game.COLONY = colony;
+                game.MAP = map;
+                game.MESSAGELOG = new MessageLog(game);
+
+                // Gameplay has to be initialized after all other elements
+                gameplay = new GAME.GameplaySequence(game, savedata.gameplay.flags);
+                game.GAMEPLAYSEQUENCE = gameplay;
+
+                resolve(game);
+            });
+        }
+
+        let loadComplete = new Promise(loadData);
+
+        return loadComplete;
+    }
+
+    return new Promise((resolve, error)=>{
+        // Load the file as text
+        file.text()
+            // Parse the file to json and pass to the load function 
+            .then((text)=>load(JSON.parse(text)))
+            .then(game=>resolve(game))
+            .catch((e)=>{console.log("failed to load save file", e); error(e);})
+    });    
+}
+
+/**
  * Creates a new CombatCharacter for the given combatant
  * @param {Number} id - The combatant id 
  * @param {*} combatants - GAME.ENCOUNTERS.combatants
@@ -256,7 +445,7 @@ export function makeTranslationLookup(game, strings, key){
         // key is the translation lookup for the current UI
         // Each index of strings (the enumerated object provided on creation)
         //  should correspond to the same index in the translation lookup
-        let string = game.STRINGS.ui[key][strings.index(_enum)];
+        let string = game.STRINGS.ui[key][strings.indexOf(_enum)];
 
         // If this is not a template that needs replacement, just return the string
         if(!isTemplate) return string;

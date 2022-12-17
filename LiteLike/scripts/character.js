@@ -250,23 +250,23 @@ export class PlayerCharacter extends Character{
 
         let weapons = [];
         // If there are weapons in equipment, copy the array over
-        if(equipment.hasOwnProperty("weapons")) weapons = Array.from(equipment.weapons);
+        if(equipment.hasOwnProperty("weapons") && equipment.weapons) weapons = Array.from(equipment.weapons);
 
         let armor = null;
         // If there is armor, set the Character's armor to that armor
-        if(equipment.hasOwnProperty("armor")) armor = equipment.armor;
+        if(equipment.hasOwnProperty("armor") && equipment.armor) armor = equipment.armor;
 
         let items = [];
         // If there are items in equipment, copy the array over
-        if(equipment.hasOwnProperty("items")) items = Array.from(equipment.items);
+        if(equipment.hasOwnProperty("items") && equipment.items) items = Array.from(equipment.items);
 
         let transport = null;
         // If there is transport, set the Character's transport to that transport
-        if(equipment.hasOwnProperty("transport")) transport = equipment.transport;
+        if(equipment.hasOwnProperty("transport") && equipment.transport) transport = equipment.transport;
 
         let resources = [];
         // If there are items in equipment, copy the array over
-        if(equipment.hasOwnProperty("resources")) resources = Array.from(equipment.resources);
+        if(equipment.hasOwnProperty("resources") && equipment.resources) resources = Array.from(equipment.resources);
 
         this.equipment = {weapons, armor, items, transport, resources};
     }
@@ -293,6 +293,8 @@ export class PlayerCharacter extends Character{
     get weapons(){return this.equipment.weapons;}
     get items(){ return this.equipment.items;}
     get resources(){ return this.equipment.resources;}
+    get transport(){ return this.equipment.transport;}
+    get armor(){ return this.equipment.armor;}
 }
 
 /**

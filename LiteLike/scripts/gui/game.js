@@ -1,6 +1,6 @@
 "use-strict";
 
-import { makeTranslationLookup } from "../io.js";
+import { loadSave, saveFile, makeTranslationLookup } from "../io.js";
 import { enumerate } from "../utils.js";
 
 export class GameGUI{
@@ -9,60 +9,67 @@ export class GameGUI{
         // None
         "NONE",
         // Equipment Types
-        "RESOURCES", "ITEMS", "WEAPONS", "ARMOR", "TRANSPORTS"
+        "RESOURCES", "ITEMS", "WEAPONS", "ARMOR", "TRANSPORTS",
+        // Game Management
+        "NEW", "SAVE", "LOAD", "QUIT"
     )
 
-    constructor(game){
+    constructor(game, demos){
         this.game = game;
-        this.pages = [];
-        this.currentpage = null;
+        if(typeof demos == "undefined") demos = null;
+        this.demos = demos;
 
         this.translate = makeTranslationLookup(this.game, this.STRINGS, "game");
     }
 
-    get statuspanel(){ return document.getElementById("statuspanel"); }
-    get homepanel(){ return document.getElementById("home"); }
-    get homenavbar(){ return document.getElementById("homenavbar"); }
-    get homecontent(){ return document.getElementById("homecontent"); }
+    get menu(){ return document.getElementById("menu"); }
+    get gamewindow(){ return document.getElementById("gamewindow"); }
     
     setupUI(){
-        document.body.insertAdjacentHTML("beforeend", `<div id="statuspanel"></div><div id="home" style="width:100%;height:75vh;"><div id="homenavbar"></div><hr /><div id="homecontent"></div></div>`);
+        document.body.insertAdjacentHTML("afterbegin", `<div id="menu" class="menu">
+        <div id="mainmenu" class="menu">
+            <button id="playbutton">${this.translate(this.STRINGS.NEW)}</button>
+            <label>${this.translate(this.STRINGS.LOAD)}<input id="loadbutton" type="file" accept=".json"></input></label>
+        </div>
+    </div><div id="gamewindow"></div>`)
+        document.getElementById("playbutton").onclick = this.newGame.bind(this);
+        document.getElementById("loadbutton").addEventListener("change", this.loadSave.bind(this));
+        if(this.demos) this.demos(this.game);
     }
 
-    /**
-     * Creates a Button in Home's navigation bar with displayname as its text. When selected the button will show the page with id `${id}Page`.
-     * @param {String} id - The id to apply to the Button
-     * @param {String} displayname - The Button's text
-     * @returns {Element} - The created button. This can be used to immediately activate the page via setPage
-     */
-    registerPage(id, displayname){
-        // Add to navbar
-        this.homenavbar.insertAdjacentHTML("beforeend", `<button id="${id}">${displayname}</button>`);
-        let button = this.homenavbar.lastElementChild;
-        // Hookup button to show page
-        button.onclick = ()=>this.setPage(button);
-        // Make sure page is hidden
-        this.homecontent.querySelector(`#${id}Page`).style.height = "0px";
-        return button;
+    exitToMainMenu(){
+        this.game.exitGame();
+        while(this.gamewindow.lastElementChild) this.gamewindow.lastElementChild.remove();
+        this.menu.style.display = "block";
     }
-    /**
-     * Callback for Home Page Buttons: swaps the currently displayed page to the selected one.
-     * Register Page is used to setup this callback
-     * Adapted from colonydemo
-     * 
-     * @param {Element} button - The button pressed
-     */
-    setPage(button){
-        this.currentpage = button.id;
-        let pageid = button.id+"Page";
-        // Reenable all buttons
-        for(let button of this.homenavbar.children) button.disabled = false;
-        // Hide all pages
-        for(let div of this.homecontent.children) div.style.height = "0px";
-        // Disable Button
-        button.disabled = true;
-        // Show correct page
-        document.getElementById(pageid).style.height = "100%";
+
+    newGame(){
+        this.menu.style.display = "none";
+        this.game.newGame();
+        this.game.COLONY.colonyLoop();
+    }
+
+    loadSave(event){
+        loadSave(event.target.files[0]).then(
+            game=>{
+                this.menu.remove();
+                window.GAME = game;
+                game.setupUI(this.demos);
+                game.UI.setupUI();
+                game.UI.menu.style.display = "none";
+                game.setupGameplayUI();
+                game.COLONY.colonyLoop();
+            }
+        )
+    }
+
+    saveGame(){
+        saveFile(window.GAME);
+    }
+
+    traverseMainMenu(target){
+        for(let child of this.menu.children) child.style.display="none";
+        document.getElementById(target).style.display = "block";
     }
 
 }

@@ -4,7 +4,7 @@ import {PlayerCharacter, roles} from "./character.js";
 import { TheColony, sectors} from "./colony.js";
 import * as COLONY from "./colony.js";
 import {Map} from "./map.js";
-import { Encounter, EncounterSequence } from "./encounters.js";
+import { Encounter, EncounterSequence, encountertype } from "./encounters.js";
 import {GameGUI} from "./gui/game.js";
 import { MessageLog } from "./messagelog.js";
 
@@ -26,7 +26,10 @@ export class Game extends UTILS.EventListener{
         // TODO: ? Maybe add Player/Colony Added events?
     );
     /**
-     * Create a new Game instance
+     * Create a new Game instance.
+     * This Game instance does not have any Object Data loaded and therefore
+     * cannot create gameplay without first calling loadData()
+     * 
      * @param {Object} state - A State Object for seedrandom
      */
     constructor(state){
@@ -37,40 +40,23 @@ export class Game extends UTILS.EventListener{
         }else{ // Otherwise, generate a new state-full RNG
             this.random = new Math.seedrandom(Math.random(), {state:true});
         }
-        
+
         // Default language is english
         this.LANGUAGE = "english";
         // Strings will store an Object that we can lookup
         // text to display in the current language
         this.STRINGS = null;
 
-        // Load the default language (english)
-        IO.loadStrings(this.LANGUAGE)
-            .then(result=>{this.STRINGS = result;}) // Store the Language Lookup Object in STRINGS
-            .catch(error=> console.log(error));
-
         // Database of all objets from items.js
         this.ITEMS = null;
-        // Load the items
-        IO.loadItems()
-            .then(result=>{this.ITEMS = result;})
-            .catch(error=> console.log(error));
 
         // Database of all encounters
-        this.ENCOUNTERS;
-        // Load event data
-        IO.loadEncounters()
-            .then(result=>{this.ENCOUNTERS = result;})
-            .catch(error=>console.log(error));
+        this.ENCOUNTERS = null;
 
+        // Master list of Jobs {Object} performed by Meeple on The Colony
         this.JOBS = null;
+        // Master list of Sectors {Object} which can be acquired by The Colony
         this.SECTORS = null;
-        IO.loadColony()
-            .then(result=>{
-                this.JOBS = result.jobs;
-                this.SECTORS = result.sectors;
-            })
-            .catch(error=> console.log(error));
 
         // Player Character
         this.PLAYER = null;
@@ -93,6 +79,50 @@ export class Game extends UTILS.EventListener{
         // A separate class for handling progression/unlock/upgrade trees/sequences
         this.GAMEPLAYSEQUENCE = null;
     }
+    
+    loadData(){
+        let completed = new Promise((resolve, fail)=>{
+            let calls = 0;
+            /** Callback for each async load of the Game constructor.
+             *  When all objects are loaded, triggers the Game.loaded event
+             */
+            function loading(){
+                calls += 1;
+                for(let value of [this.STRINGS, this.ITEMS, this.ENCOUNTERS, this.JOBS, this.SECTORS]){
+                    if(!value || typeof value == "undefined"){
+                        if(calls > 4) return fail(game);
+                        return;
+                    }
+                }
+                resolve(this);
+            }
+            
+            // Load the current language (default english) then check if we are done loading all data
+            IO.loadStrings(this.LANGUAGE)
+                .then(result=>{this.STRINGS = result; loading.bind(this)();}) // Store the Language Lookup Object in STRINGS
+                .catch(error=> console.log(error));
+
+            // Load the items then check if we are done loading all data
+            IO.loadItems()
+                .then(result=>{this.ITEMS = result; loading.bind(this)();})
+                .catch(error=> console.log(error));
+
+            // Load event data then check if we are done loading all data
+            IO.loadEncounters()
+                .then(result=>{this.ENCOUNTERS = result; loading.bind(this)();})
+                .catch(error=>console.log(error));
+
+            // Load colony-related data then check if we are done loading all data
+            IO.loadColony()
+                .then(result=>{
+                    this.JOBS = result.jobs;
+                    this.SECTORS = result.sectors;
+                    loading.bind(this)();
+                })
+                .catch(error=> console.log(error));
+        });
+        return completed;
+    }
 
     /**
      * Returns the Job with the given id
@@ -107,11 +137,17 @@ export class Game extends UTILS.EventListener{
     }
 
     /**
+     * Initializes the main menu
+     * @param {Function} demos- Additional code to setup a demos submenu
+     */
+    setupUI(demos){
+        this.UI = new GameGUI(this, demos);
+    }
+
+    /**
      * Creates the skeletal framework for the Game Interface
      */
-    setupUI(){
-        this.UI = new GameGUI(this);
-        this.UI.setupUI();
+    setupGameplayUI(){
         this.COLONY.setupUI();
         this.MESSAGELOG.setupUI();
     }
@@ -126,12 +162,45 @@ export class Game extends UTILS.EventListener{
         // out with 3 batteries and 10 scrap
         this.COLONY.addResource(1,3);
         this.COLONY.addResource(2,10);
-        this.MAP = this.newMap();
+        this.MAP = this.newMap(this.random(), true);
         this.MESSAGELOG = new MessageLog(this);
         this.GAMEPLAYSEQUENCE = new GameplaySequence(this);
-        this.setupUI();
+        this.setupGameplayUI();
         // Using the default GameplaySequence, displays an inital message in the MessageLog
         this.GAMEPLAYSEQUENCE.newGame();
+    }
+
+    exitGame(){
+        if(this.ENCOUNTER && this.ENCOUNTER.get()){
+            let encounter = this.ENCOUNTER.get();
+            // DEVNOTE- atm CombatEncounter is the only Encounter type that has listeners
+            //      and/or a loop attached to it that have to be cleared
+
+            // Calling resolveCombat will notify listeners that combat is over,
+            // stop the loop, and clear listeners on enemy and Combat
+            // DEVNOTE- We have not implemented any exit checks within combatLoop,
+            //      so it will continue to execute until it reaches the end
+            if(encounter.type == encountertype.COMBAT) encounter.instance.resolveCombat();
+        }
+        // Remove Player Listeners
+        this.PLAYER.removeAllListeners();
+        // Remove Map listners
+        this.MAP.removeAllListeners();
+        // Stop the colony loop
+        this.COLONY.clearLoop();
+        // Remove Colony Listeners
+        this.COLONY.removeAllListeners();
+        // Remove all our listeners
+        this.removeAllListeners();
+
+        // Clear all Gameplay Objects
+        this.ENCOUNTER = null;
+        this.PLAYER = null;
+        this.COLONY = null;
+        this.MAP = null;
+        this.GAMEPLAYSEQUENCE = null;
+        this.MESSAGELOG = null;
+        this.UI = null;
     }
 
     /**
@@ -141,10 +210,10 @@ export class Game extends UTILS.EventListener{
         let player = new PlayerCharacter(0, [roles.CHARACTER, roles.PLAYER],
             {hp:5, currentHP: 5},
             {
-                weapons: [new EQUIP.Weapon(this.ITEMS.weapons[0])],
+                weapons: null,
                 armor:null,
                 transport:null,
-                items:[new EQUIP.Item(this.ITEMS.items[0], 1)]
+                items: null
             });
         return player;
     }
@@ -233,7 +302,7 @@ export class Game extends UTILS.EventListener{
 /**
  * A class to implement Gameplay Unlock/Upgrade Trees/Sequences
  */
-class GameplaySequence{
+export class GameplaySequence{
     STRINGS = UTILS.enumerate(
         // Intro Message
         "NEWGAME",
@@ -313,8 +382,17 @@ class GameplaySequence{
 
         // Random Event timer
         this.colonyTimeout = null;
+        this.flags = [];
+
         // Unlock flags
-        this.flags = [...flags];
+        let result;
+        for(let flag of flags){
+            // validate flag
+            [flag, result] = this.validateFlag(flag);
+            // Result indicates that the GameplaySequence already has it
+            // so if it doesn't have it, add it
+            if(!result) this.flags.push(flag);
+        }
 
         // Now that flags are set, do any initial setup required
         // based on current gamestate
@@ -514,6 +592,9 @@ class GameplaySequence{
         //      there should be no way that recurseTree does not return a function
 
         // Call the Unlock Event function 
+        // DEVNOTE- The callback is responsible for calling setNextColonyTimeout
+        //      when it is done; we want to wait until the Player has resolved
+        //      any Encounters triggered by the callback before starting the next one
         result.bind(this)();
 
         // Reduce Remaining
@@ -634,6 +715,10 @@ class GameplaySequence{
      * When the Player first supplies power to TheColony, grant TheColony the SECTORS 
      */
     firstPower(){
+        // If the COLONY already unlocked SECTORS, skip and remove listener
+        if(!this.game.COLONY.checkUnlocks("SECTORS").length) return this.game.COLONY.removeEventListener("powerlevelmodified", this.listeners.plm);
+
+        // Unlock sectors
         this.game.COLONY.unlock("SECTORS");
         // There are no other powerlevelmodified unlocks, so remove listener
         this.game.COLONY.removeEventListener("powerlevelmodified", this.listeners.plm);
@@ -656,8 +741,12 @@ class GameplaySequence{
             // We're only interested in gaining (positive qty)
             // scrap
             if(res == 2 && qty > 0){
+                let [flag, hasFlag] = this.validateFlag(this.FLAGS.SHOP);
+                // We already have the flag
+                // DEVNOTE- This should only occur after loading from save
+                if(hasFlag) return true;
                 // Set our flag for the shop
-                this.flags.push(this.FLAGS.SHOP);
+                this.flags.push(flag);
                 // Let Colony UI know it can setup the shop
                 this.game.COLONY.ui.setupShop();
 
@@ -680,6 +769,8 @@ class GameplaySequence{
         for(let [res, qty] of event.resourcechange){
             // We're only interested in gaining (positive qty) batteries
             if(res == 1 && qty > 0){
+                // COLONY already has the RESIDENTIAL sector, so skip
+                if(!this.game.COLONY.checkSectors([this.game.SECTORS[sectors.RESIDENTIAL]]).length) return true;
                 // Add the Residential sector to The Colony
                 this.game.COLONY.addSector(this.game.SECTORS[sectors.RESIDENTIAL]);
 
@@ -696,12 +787,14 @@ class GameplaySequence{
      * When the Player 
      */
     firstMeeple(event){
+        // We already have the ColonyEvents flag, so remove listener and return without doing anything
+        if(!this.checkFlags([this.FLAGS.COLONYEVENTS]).length) return this.game.COLONY.removeEventListener("meeplemodified",this.listeners.mm);
         // Unlock Colony Events
         this.flags.push(this.FLAGS.COLONYEVENTS);
         // Queue up next event timout
         this.setNextColonyTimeout();
         // Make sure to remove listener so we don't keep triggering this event
-        this.game.COLONY.removeEventListener(this.listeners.mm);
+        this.game.COLONY.removeEventListener("meeplemodified",this.listeners.mm);
     }
 
     /** COLONY UNLOCK EVENTS
@@ -715,11 +808,10 @@ class GameplaySequence{
         this.game.MESSAGELOG.addMessage(this.translate(this.STRINGS.CHARGINGUNLOCK, this.game.COLONY.ui.getDescriptor()));
         // Unlock on TheColony
         this.game.COLONY.unlock("CHARGING");
+        // Set next colony timeout
+        this.setNextColonyTimeout();
     }
 }
-
-let DEBUGSEED = JSON.parse(`{"i":7,"j":8,"S":[250,210,70,5,116,152,156,50,109,197,228,20,149,6,176,124,151,69,33,148,196,45,94,41,171,90,73,91,218,61,212,206,137,44,213,118,227,38,180,93,15,208,233,145,17,187,11,205,108,78,115,138,77,16,54,87,88,242,39,175,21,128,253,193,10,66,80,129,191,18,29,173,104,142,105,214,161,204,67,71,40,12,133,203,7,107,143,89,254,127,255,144,234,241,100,238,150,60,185,225,140,172,247,216,200,232,1,32,114,113,2,99,24,51,64,9,42,230,201,177,219,123,164,186,14,162,221,52,26,184,163,194,122,220,167,157,68,155,19,166,131,92,53,48,97,125,27,248,146,192,215,55,35,209,74,111,251,47,46,240,243,25,195,207,178,95,139,147,246,49,98,211,119,226,102,183,85,83,189,188,170,63,22,56,252,72,81,4,112,199,202,174,154,223,132,106,120,43,28,76,57,117,229,84,136,30,0,121,23,165,190,126,96,3,245,36,249,168,101,65,135,231,59,244,141,110,34,235,239,58,179,8,198,169,79,82,86,62,130,222,103,159,31,237,236,182,153,134,37,75,158,160,224,181,13,217]}`);
-window.GAME = new Game(DEBUGSEED);
 
 {
     /**

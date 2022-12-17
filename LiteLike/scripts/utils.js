@@ -13,7 +13,7 @@ export function enumerate(){
     // Add all arguments to the object, using them as the key
     // and their Symbol as the value
     for(let a of arguments) _s[a] = Symbol(a);
-    _s.index = (value)=>Object.values(_s).indexOf(value);
+    _s.indexOf = (value)=>Object.values(_s).indexOf(value);
     // Return a frozen version of the object
     return Object.freeze(_s);
 }
@@ -97,7 +97,8 @@ export class EventListener{
     _initializeListeners(){
         // For each valid event
         for(let sym of Object.values(this._events)){
-
+            // Only add strings/values
+            if(typeof sym !== "string" && typeof sym !== "symbol") continue;
             // check if event is already initialized
             let value = this._listeners[sym]
 
