@@ -68,9 +68,10 @@ function residential(sector, colony, random){
     // We'll collect new the new meeple so we can trigger the meeplemodified
     // event
     let newmeeple = [];
+    let now = UTILS.now();
     for(let i = 0; i < meeple; i++){
         // Add meeple created by colony.addNewMeeple to newmeeple array
-        newmeeple.push(colony.addNewMeeple());
+        newmeeple.push(colony.addNewMeeple(now));
     }
 
     // Trigger meeplemodified event

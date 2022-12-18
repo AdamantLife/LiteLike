@@ -50,7 +50,7 @@ export class GameGUI{
     }
 
     loadSave(event){
-        loadSave(event.target.files[0]).then(
+        loadSave(event.target.files[0], this.game._gameplayclass).then(
             game=>{
                 this.menu.remove();
                 window.GAME = game;

@@ -1,13 +1,14 @@
 "use strict";
 import * as GAME from "./game.js";
 import * as MAP from "./map.js";
-import * as EQUIP from "./items.js";
+import * as ITEMS from "./items.js";
 import * as COLONY from "./colony.js";
 import * as CHARACTER from "./character.js";
 import * as UTILS from "./utils.js";
 import { MessageLog } from "./messagelog.js";
 import {instanceFromJSON} from "./utils.js";
 import {itemCallbacks} from "./callbacks.js";
+import { GameplaySequence } from "./gameplay.js";
 
 
 /**
@@ -38,9 +39,9 @@ export function loadItems(){
     function parse(data){
         let weapons = [], armor = [], items = [], resources = [], transports = [];
 
-        weapons = parseStandardJson(data.weapon, EQUIP.WeaponType);
+        weapons = parseStandardJson(data.weapon, ITEMS.WeaponType);
 
-        armor = parseStandardJson(data.armor, EQUIP.Armor);
+        armor = parseStandardJson(data.armor, ITEMS.Armor);
         
         // Item callbacks need to be generated based on their arguments
         // Each Item's id is its index in the Item array
@@ -61,12 +62,12 @@ export function loadItems(){
             item.callback = itemCallbacks[cb](...args);
 
             // add item to list
-            items.push(instanceFromJSON(EQUIP.ItemType, item));
+            items.push(instanceFromJSON(ITEMS.ItemType, item));
         }
 
-        resources = parseStandardJson(data.resource, EQUIP.ResourceType);
+        resources = parseStandardJson(data.resource, ITEMS.ResourceType);
 
-        transports = parseStandardJson(data.transport, EQUIP.Transport);
+        transports = parseStandardJson(data.transport, ITEMS.Transport);
 
         return {weapons, armor, items, resources, transports};
     }
@@ -206,20 +207,23 @@ export function saveFile(game){
         // For armor and transport, we are only saving ID as they are singleton
         // Per DEVNOTES, the Player will always load the save into The Colony, so we don't
         //      need the transport's current fuel
-        armor:game.PLAYER.armor ?  game.PLAYER.armor.id : game.PLAYER.armor,
-        transport: game.PLAYER.transport ? game.PLAYER.transport.id : game.PLAYER.transport
+        armor:game.PLAYER.armor !== null ?  game.PLAYER.armor.id : game.PLAYER.armor,
+        transport: game.PLAYER.transport !== null ? game.PLAYER.transport.id : game.PLAYER.transport
     }
-    // For resources and items, the only thing we need to save is id and quantity
-    for(let [outputstorage, playerstorage] of [
-        [output.player.equipment.resources, game.PLAYER.resources],
-        [output.player.equipment.items, game.PLAYER.items]
-    ]){
-        for(let obj of playerstorage){
-            outputstorage.push([obj.type.id, obj.quantity]);
-        }
-    }
+
     // For weapons, we're just saving the weapontype id
     for(let weapon of game.PLAYER.weapons) output.player.equipment.weapons.push(weapon.type.id);
+
+    // Convert Item Array to just id, qty arrays
+    for(let obj of game.PLAYER.items){
+        output.player.equipment.items.push([obj.type.id, obj.quantity]);
+    }
+
+    // Convert Resource Object to id, qty array
+    for(let obj of Object.values(game.PLAYER.resources)){
+        output.player.equipment.resources.push([obj.type.id, obj.quantity]);
+    }
+    
 
     // DEVNOTE- we do not save Game.ENCOUNTER because the game can only be saved in The Colony
     //      and always initializes from The Colony
@@ -243,8 +247,9 @@ export function saveFile(game){
 /**
  * Loads a game from the given save file
  * @param {File} file - The save file
+ * @param {GameplaySequence} gampeplaysequence - A GameplaySequence class to assign to the new game
  */
-export function loadSave(file){
+export function loadSave(file, gameplaysequence){
     /**
      * After the file has been loaded and parsed to JSON, a new game is
      * created within a promise (because Game loads data asynchronously)
@@ -260,14 +265,34 @@ export function loadSave(file){
             let game;
             let now = UTILS.now();
         
-            game = new GAME.Game(savedata.state);
+            game = new GAME.Game(savedata.state, gameplaysequence);
             game.loadData().then((game)=>{
                 let player, colony, map, gameplay, messagelog;
 
-                
+                let resources = {}, items = [], weapons = [];
+                let equipment = {resources, items, weapons, armor: null, transport: null};
+
+                // Armor and transport are singletons and therefore are just lookedup
+                if(savedata.player.equipment.armor !== null) equipment.armor = game.ITEMS.armor[savedata.player.equipment.armor];
+                if(savedata.player.equipment.transport !== null) equipment.transport = game.ITEMS.transports[savedata.player.equipment.transport];
+
+                // Resources, Items, and Weapons need instances generated
+                for(let [id, qty] of savedata.player.equipment.resources){
+                    let resource = new ITEMS.Resource(game.ITEMS.resources[id], qty);
+                    resources[id] = resource;
+                }
+                for(let [id, qty] of savedata.player.equipment.items){
+                    let item = new ITEMS.Item(game.ITEMS.items[id], qty);
+                    items.push(item);
+                }
+                for(let id of savedata.player.equipment.weapons){
+                    let weapon = new ITEMS.Weapon(game.ITEMS.weapons[id]);
+                    weapons.push(weapon);
+                }
+
                 player = new CHARACTER.PlayerCharacter(0, [CHARACTER.roles.CHARACTER, CHARACTER.roles.PLAYER],
                     savedata.player.statistics,
-                    savedata.player.equipment
+                    equipment
                     );
         
                 
@@ -277,7 +302,10 @@ export function loadSave(file){
                     sector.level = level;
                     sector.newTimer(now);
                     sector.timer.setOffsetTime(now, offset);
-                    if(ready) sector.timer.setReady();
+                    if(ready){
+                        sector.timer.setReady();
+                        sector.timer.freeze();
+                    }
                     sectors.push(sector);
                 }
 
@@ -305,7 +333,7 @@ export function loadSave(file){
                 game.MESSAGELOG = new MessageLog(game);
 
                 // Gameplay has to be initialized after all other elements
-                gameplay = new GAME.GameplaySequence(game, savedata.gameplay.flags);
+                gameplay = new game._gameplayclass(game, savedata.gameplay.flags);
                 game.GAMEPLAYSEQUENCE = gameplay;
 
                 resolve(game);
@@ -339,19 +367,19 @@ export function createCombatant(id, combatants, items){
     // Compile weapons
     let weapons = [];
     // Get WeaponType for each weaponid and convert to Weapon Object
-    for(let weaponid of comb.weapons) weapons.push(new EQUIP.Weapon(items.weapons[weaponid]));
+    for(let weaponid of comb.weapons) weapons.push(new ITEMS.Weapon(items.weapons[weaponid]));
 
     // Compile items
     let combitems = [];
     // Get ItemType for each itemid and convert to Item Object with the given quantity
     // Add the Item to the items bag (items are unsorted)
-    for(let [itemid, qty] of comb.items) combitems.push(new EQUIP.Item(items.items[itemid], qty));
+    for(let [itemid, qty] of comb.items) combitems.push(new ITEMS.Item(items.items[itemid], qty));
 
     // Compile resources
     let combresources = [];
     // Get ResourceType for each resourceid and convert to Resource Object with the given quantity
     // Store that Resource Object at its correct index
-    for(let [resid, qty] of comb.resources) combresources[resid]=new EQUIP.Resource(items.resources[resid], qty);
+    for(let [resid, qty] of comb.resources) combresources[resid]=new ITEMS.Resource(items.resources[resid], qty);
 
     return new CHARACTER.CombatCharacter(
         // ID, Roles

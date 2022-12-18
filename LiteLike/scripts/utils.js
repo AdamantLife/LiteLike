@@ -200,9 +200,16 @@ export class EventListener{
 
         // Include eventtype for reference
         event.eventtype = eventtype;
-        
-        for(let listener of this._listeners[eventtype]){
+
+        // Iterate over listeners, invoking them
+        // DEVNOTE- We're making a copy of _listeners because some listeners
+        //      may remove themselves after/as part of being called which
+        //      disrupts the iteration
+        for(let listener of [...this._listeners[eventtype]]){
+            // Accept a response from the listener
             let result = listener(event);
+            // If the result is false (exactly; not falsey)
+            // stop processing listeners and exit
             if(result === false) return;
         }
     }

@@ -48,8 +48,12 @@ export class TheColonyGUI{
         this.pages = [];
         this.currentpage = null;
 
+        this.tempListeners = {
+            "shop": this.unlockShop.bind(this)
+        }
         this.colony.addEventListener("powerlevelmodified", this.updatePowerLevel.bind(this));
         this.colony.addEventListener("resourcesmodified", this.updateStatusbox.bind(this));
+        this.colony.addEventListener("unlockadded", this.tempListeners.shop);
         // These are bound in setupShop, but noted here for reference
         // this.colony.addEventListener("itemsmodified", this.updateStatusbox.bind(this));
         // this.colony.addEventListener("weaponsmodified", this.updateStatusbox.bind(this));
@@ -201,26 +205,40 @@ export class TheColonyGUI{
         this.updatePowerLevel({powerlevel:this.colony.powerLevel});
 
         // If The Colony has Sectors unlocked, set it up
-        if(!this.colony.checkUnlocks(["SECTORS"]).length) this.setupSectors();
+        if(!this.colony.checkUnlocks(["SECTORS"]).length){
+            this.setupSectors();
+            // Add existing sectors
+            for(let sector of this.colony.sectors){
+                // Spoofing the sectoradded event
+                this.addSector({sector});
+            }
+        }
         // If the Gampeplaysequence has the Shop unlocked, set it up
-        if(!this.game.GAMEPLAYSEQUENCE.checkFlags(["SHOP"]).length) this.setupShop();
+        if(!this.colony.checkUnlocks(["SHOP"]).length) this.setupShop();
         // If The Colony has the Residential Sector unlocked, set it up
         if(this.colony.sectors.indexOf(sectors.RESIDENTIAL) >= 0) this.setupMeeple();
     }
 
+    /**
+     * 
+     * @param {TheColonyEvent} event - The Colony's unlockadded event
+     */
+    unlockShop(event){
+        // The Colony now has the SHOP unlock
+        if(!this.colony.checkUnlocks(["SHOP"]).length) this.setupShop();
+    }
+
     setupSectors(){
+        // Setup and register Sectors page
         let home = this.homecontent;
         home.insertAdjacentHTML('beforeend', `<div id="sectorsPage"><table><tbody id="sectortable"></tbody></table></div>`);
         this.registerPage("sectors", this.translate(STRINGS.SECTORPAGE));
-
-        // Sectors are added individually
-        for(let sector of this.colony.sectors){
-            // Spoofing the sectoradded event
-            this.addSector({sector});
-        }
     }
 
     setupShop(){
+        // Make sure to remove the listener because we already have it
+        this.colony.removeEventListener("unlockadded", this.tempListeners.shop);
+
         // Add Items and Weapons to the sidebar
         let statpanel = this.statuspanel;
         // Create Resource Panel
@@ -523,7 +541,7 @@ export class TheColonyGUI{
             // other jobs pull from
             let toggle = `<td><table><tbody>
             <tr><td class="plusmeeple"></td><td class="plusmeeple plustenmeeple"></td></tr>
-            <tr><td class="minusmeeple"></td><td class="minusmeeple minustenmeeple"></td></tr>
+            <tr><td class="minusmeeple disabled"></td><td class="minusmeeple minustenmeeple disabled"></td></tr>
         </tbody></table></td>`
             if(job.id == 0) toggle = ``;
 
@@ -588,6 +606,9 @@ export class TheColonyGUI{
             // Otherwise, it gets resorted exactly like everything
             SITEGUI.sortTableBody(incometable);
         }
+
+        // Make sure arrows are up-to-date
+        this.updateFreeMeeple();
     }
 
     /**
@@ -713,6 +734,7 @@ export class TheColonyGUI{
 
         // if updateIncomeTotal, do so
         if(updateIncomeTotal) this.updateIncomeTotal(...updateincometotals);
+
 
         // Return all rows that had their incomes changed
         return updateincometotals;
@@ -899,8 +921,13 @@ export class TheColonyGUI{
         let changecallback = (event)=>{td.querySelector("div.progressbar").classList.remove("warmup"); td.classList.remove("progress"); td.classList.add("collect");};
         progressbar.addEventListener("animationend", changecallback);
 
+        // Sector has no levels
+        if(!sector.level){
+            // Disable it
+            td.querySelector("div.progressbar").classList.add("disabled");
+        }
         // If the sector timer is ready and is frozen, call the changecallback now
-        if(sector.timer.isReady && sector.timer.isFrozen){
+        else if(sector.timer.isReady && sector.timer.isFrozen){
             changecallback();
         }
         // If the sector is being added mid-cycle
@@ -926,14 +953,9 @@ export class TheColonyGUI{
             progressbar.style.width = "100%";},700);
         }
         // If the sector has levels (and therefore is cycling)
-        else if(sector.level){
+        else{
             // Add the warmup class to show that it's cycling normally
             td.querySelector("div.progressbar").classList.add("warmup");
-        }
-        // Sector has no levels
-        else{
-            // Disable it
-            td.querySelector("div.progressbar").classList.add("disabled");
         }
     }
 

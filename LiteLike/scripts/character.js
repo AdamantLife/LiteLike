@@ -264,9 +264,9 @@ export class PlayerCharacter extends Character{
         // If there is transport, set the Character's transport to that transport
         if(equipment.hasOwnProperty("transport") && equipment.transport) transport = equipment.transport;
 
-        let resources = [];
+        let resources = {};
         // If there are items in equipment, copy the array over
-        if(equipment.hasOwnProperty("resources") && equipment.resources) resources = Array.from(equipment.resources);
+        if(equipment.hasOwnProperty("resources") && equipment.resources) Object.assign(resources, equipment.resources);
 
         this.equipment = {weapons, armor, items, transport, resources};
     }
@@ -338,7 +338,7 @@ export class CombatCharacter extends Character{
         if(equipment.hasOwnProperty("items")) items = equipment.items;
         this.items = items;
 
-        let resources = [];
+        let resources = {};
         // If there are items in equipment, use that value
         if(equipment.hasOwnProperty("resources")) resources = equipment.resources;
         this.resources = resources;

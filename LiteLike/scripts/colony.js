@@ -24,6 +24,7 @@ export const BASEMEEPLE = 5;
 /** TODO: Fill in names */
 export const unlocks = UTILS.enumerate(
     "SECTORS", // unlocks the sectors Tab (our version of "A Silent Forest") and SCRAP
+    "SHOP", // unlocks the Trade section
     "ENGINEER","FARMER","CHARGING","D","E","F");
 
 // Sectors are base upgrades
@@ -74,7 +75,7 @@ export class TheColony extends UTILS.EventListener{
         if(Number.isInteger(powerLevel)) this.powerLevel = Math.min(Math.max(0, powerLevel), MAXPOWER);
         // TheColony's Power Meter
         // Every minute (60 seconds * 1000ms), the power decreases
-        this.powerTimer = new Timer(undefined, 60000);
+        this.powerTimer = new Timer(UTILS.now(), 60000);
 
         this.sectors = Array.from(sectors);
 
@@ -401,7 +402,7 @@ export class TheColony extends UTILS.EventListener{
         this.sectors.push(sector);
 
         // If sector is already Level 1+, grant its unlocks
-        if(sector.level >= 1) sector.setflags();
+        if(sector.level >= 1) sector.setFlags();
 
         // Reestablish Timer
         sector.newTimer();
