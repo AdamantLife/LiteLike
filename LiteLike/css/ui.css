@@ -111,39 +111,77 @@ label:has(#loadbutton):hover{
 
 .statusbox>.body{
     width:25vw;
-    height:25vh;
     background-color: white;
     border: solid;
     border-top: none;
-    animation: statusopen;
-    animation-duration: 250ms;
-    animation-timing-function: ease-out;
     overflow: hidden;
 }
 
-.statusbox>.body.hidden{
-    height:0vh !important;
+.statusbox>.body:not(.tall){
+    height:25vh;
+    animation: statusopen;
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+}
+
+.statusbox>.body.hidden:not(.tall){
     animation: statusclose;
     animation-duration: 250ms;
     animation-timing-function: ease-out;
 }
+
 
 @keyframes statusopen {
     from{
         height:0vh;
     }
     to{
-        height: 50vh;
+        height: 25vh;
     }
 }
 
 @keyframes statusclose {
+    from{
+        height: 25vh;
+    }
+    to{
+        height:0vh;
+    }
+}
+
+.statusbox>.body.tall{
+    height:50vh;
+    animation: statusopentall;
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+}
+
+.statusbox>.body.hidden.tall{
+    animation: statusclosetall;
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+}
+
+@keyframes statusopentall {
+    from{
+        height:0vh;
+    }
+    to{
+        height: 50vh;
+    }
+}
+
+@keyframes statusclosetall {
     from{
         height: 50vh;
     }
     to{
         height:0vh;
     }
+}
+
+.statusbox>.body.hidden{
+    height:0vh;
 }
 
 .statusbox>.body>ul{
@@ -179,6 +217,10 @@ label:has(#loadbutton):hover{
     background: linear-gradient(180deg,rgb(255,255,255,0) 0%, rgb(255,255,255,0.5) 50%,rgb(255,255,255,1) 100%);
 }
 
+    #messagebox>div.body.hidden .fadeoutmask{
+        display: none;
+    }
+
 #messagebox>.header{
     background-color: skyblue;
     color: white;
@@ -192,10 +234,6 @@ label:has(#loadbutton):hover{
     margin-bottom: 1em;
     text-indent: -1em;
     margin-left: 1em;
-}
-
-#messagebox>.body{
-    height:50vh;
 }
 
 #resourcesbox>.header{
@@ -268,19 +306,27 @@ label:has(#loadbutton):hover{
     width:50%;
 }
 
-#jobtable td.plusmeeple::after{
-    content:"\25B2";
+table.incrementer.inline{
+    display: inline;
 }
-    #jobtable td.plusmeeple.disabled{
-        color: lightgray;
+
+    table.incrementer.inline tbody{
+        display: inherit;
     }
 
-#jobtable td.minusmeeple::after{
-    content:"\25BC";
-}
-    #jobtable td.minusmeeple.disabled{
-        color: lightgray;
+    table.incrementer td.plus::after{
+        content:"\25B2";
     }
+        table.incrementer td.plus.disabled{
+            color: lightgray;
+        }
+
+    table.incrementer td.minus::after{
+        content:"\25BC";
+    }
+        table.incrementer td.minus.disabled{
+            color: lightgray;
+        }
 
 #incometable td:first-of-type{
     width:100%;
@@ -315,6 +361,56 @@ label:has(#loadbutton):hover{
 
     #incometable td.income>table td{
         padding-left: 1em;
+    }
+
+/** Travel Prep */
+#transport>div{
+    display: inline-flex;
+    width:30%;
+}
+
+table:has(tbody.loadout){
+    width:100%;
+    border-spacing: .5em;
+    border-collapse: separate;
+}
+
+tbody.loadout{
+    width:100%;
+}
+
+tbody.loadout td{
+    width:30%;
+    height:2em;
+    text-align: center;
+}
+td.loadout{
+    border:2px solid black;
+    border-radius: 3px;
+}
+tbody.loadout.weapons td.loadout{
+    background-color: mintcream;
+}
+
+tbody.loadout.items td.loadout{
+    background-color: beige;
+}
+
+span.cargo{
+    margin:5px;
+    border-radius: 3px;
+    padding: 1px 3px;
+    white-space: nowrap;
+}
+
+    span.cargo[data-type="weapon"]{
+        background: #9cff7d4d;
+    }
+    span.cargo[data-type="item"]{
+        background: #f6ff664d;
+    }
+    span.cargo[data-type="resource"]{
+        background: #ff7f504d;
     }
 
 /**        EVENTS          */

@@ -12,7 +12,7 @@ import * as UTILS from "./utils.js";
  * Function factory which produces a "heal" type callback based on the input provided
  * @param {Character} target - Character to heal
  * @param {Number} value - Amount of HP to heal
- * @returns {combatCallback} - Returns the callback use
+ * @returns {combatCallback} - Returns the callback for the associated item/ability
  */
 function heal(target, value){
     return (activator, opponent)=>{
@@ -23,7 +23,22 @@ function heal(target, value){
     }
 }
 
-export const itemCallbacks = Object.freeze({HEAL:heal });
+/**
+ * Function factory which produces a callback which places a random weapon
+ * held by the opponent onto cooldown
+ * @returns {combatCallback} - Returns the callback for the associated item/ability
+ */
+function disableRandom(){
+    return (activator, opponent)=>{
+        let weapon = opponent.randomWeapon();
+        // Opponent doesn't have weapons
+        if(!weapon) return;
+        // Reset the cooldown timer
+        weapon.cooldown.reset();
+    }
+}
+
+export const itemCallbacks = Object.freeze({HEAL:heal, DISABLERANDOM: disableRandom });
 
 /**
  * Callback for the Scrap Sector (our version of Gather Wood)

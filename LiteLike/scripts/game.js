@@ -7,10 +7,10 @@ import { Encounter, EncounterSequence, encountertype } from "./encounters.js";
 import {GameGUI} from "./gui/game.js";
 import { MessageLog } from "./messagelog.js";
 import { GameplaySequence } from "./gameplay.js";
+import * as ITEMS from "./items.js";
 
 import * as IO from "./io.js";
 import * as UTILS from "./utils.js";
-
 
 export class Game extends UTILS.EventListener{
     static EVENTTYPES = UTILS.enumerate(
@@ -124,6 +124,50 @@ export class Game extends UTILS.EventListener{
                 .catch(error=> console.log(error));
         });
         return completed;
+    }
+
+    /**
+     * Creates a new instance of the given equipment type
+     * @param {String | ITEMS.EQUIPMENTTYPE} type - The equipment type to create
+     * @param {Number} id - The id of the item to create for the given itemtype
+     * @param {Number} [qty = 1] - If the itemtype is a Stackable object, sets the qty to the given number
+     * @returns {ITEMS.EQUIPMENTTYPE} - The appropriate instance of the given equipment type
+     */
+    createEquipmentInstance(type, id, qty = 1){
+        // Convert symbols to strings
+        if(typeof type == "symbol") type = type.description;
+
+        // Determine class to build and what its type is
+        let _class, base;
+        switch(type){
+            case "ItemType":
+            case "Item":
+                _class = ITEMS.Item;
+                base = this.ITEMS.items[id];
+                break;
+            case "ResourceType":
+            case "Resource":
+                _class = ITEMS.Resource;
+                base = this.ITEMS.resources[id];
+                break;
+            case "WeaponType":
+            case "Weapon":
+                _class = ITEMS.Weapon;
+                base = this.ITEMS.weapons[id];
+                // Clear qty because this is a weapon
+                qty = null;
+                break;
+        }
+        // If type was invalid, just return
+        // DEVNOTE- as always, our policy is not to raise errors in this game
+        if(typeof _class == "undefined") return;
+        
+        // Set qty if it is available
+        if(qty){
+            return new _class(base, qty);
+        }
+        // Otherwise, don't supply qty
+        return new _class(base);
     }
 
     /**

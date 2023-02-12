@@ -137,7 +137,7 @@ export function buildStation(dynamicSequence){
                 // Give the player the Resource
                 d.game.PLAYER.getResource(1).quantity+= gain;
                 // Trigger callback
-                d.game.PLAYER.triggerEvent("resourceschange", {1: d.game.PLAYER.getResource(1), 2:d.game.PLAYER.getResource(2)});
+                d.game.PLAYER.triggerEvent("resourceschange", {resources:{1: d.game.PLAYER.getResource(1), 2:d.game.PLAYER.getResource(2)}});
             }
 
             // Message reflects the above note
@@ -192,7 +192,7 @@ export function buildStation(dynamicSequence){
                     message = `"You are most generous, my son! I am certain The Blue Eyes will keep at least two of its eyes upon you in the near future. If you ever feel like its gaze might be wandering away from you, do be sure to return and I will happily again intercede on your behalf!"`;
                     // Pay cost and notify
                     d.game.PLAYER.getResource(2).quantity -= 5;
-                    d.game.PLAYER.triggerEvent("resourceschange", {2:d.game.PLAYER.getResource(2)});
+                    d.game.PLAYER.triggerEvent("resourceschange", {resources:{2:d.game.PLAYER.getResource(2)}});
                 }else{
                     message = `As you brush past the man he grumbles something.\r\n\r\nPart of you wonders if it was a curse...`
                 }

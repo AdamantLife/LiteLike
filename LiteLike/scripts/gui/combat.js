@@ -230,7 +230,7 @@ export class CombatGui{
         this.combat.addEventListener("useweapon", this.updateInput.bind(this));
         this.combat.addEventListener("useitem", this.updateInput.bind(this));
         //      These callbacks are to reenable the item when cooldown is done
-        player.addEventListener("equipmentchange", this.updateInput.bind(this));
+        player.addEventListener("weaponchange", this.updateInput.bind(this));
         player.addEventListener("itemschange", this.updateInput.bind(this));
 
         player.addEventListener("currentHPchange", this.combatUpdateHP.bind(this));
@@ -278,7 +278,7 @@ export class CombatGui{
         // Only remove our listeners from Player
         for(let [event,listener] of [
             ["currentHPchange",this.combatUpdateHP.bind(this),], 
-            ["equipmentchange",this.updateInput.bind(this)],
+            ["weaponchange",this.updateInput.bind(this)],
             ["itemschange",this.updateInput.bind(this)]
         ]){
             this.combat.player.removeEventListener(event, listener);
@@ -334,9 +334,9 @@ export class CombatGui{
      */
     updateInput(event){
 
-        // We'll ignore character.equipmentchange-> warmup (ready flag set) because
+        // We'll ignore character.weaponchange-> warmup (ready flag set) because
         // we're more interested in when Combat clears the warmup ready flag
-        if(event.eventtype == CHARACTER.Character.EVENTTYPES.equipmentchange && event.item.constructor.name == "Weapon" && event.timer == "warmup") return;
+        if(event.eventtype == CHARACTER.Character.EVENTTYPES.weaponchange && event.item.constructor.name == "Weapon" && event.timer == "warmup") return;
 
         // We need to establish these variables to know what we are updating
         // subtype is "warmup", "activated", or "cooldown"
@@ -344,7 +344,7 @@ export class CombatGui{
         let character, objecttype, object, subtype;
 
         switch(event.eventtype){
-            case CHARACTER.Character.EVENTTYPES.equipmentchange:
+            case CHARACTER.Character.EVENTTYPES.weaponchange:
                 // this event originates from the character itself
                 character = event.character;
                 // Object is under event.item

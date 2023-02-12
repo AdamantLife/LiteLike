@@ -25,6 +25,7 @@ export const BASEMEEPLE = 5;
 export const unlocks = UTILS.enumerate(
     "SECTORS", // unlocks the sectors Tab (our version of "A Silent Forest") and SCRAP
     "SHOP", // unlocks the Trade section
+    "MAP", // unlocks the Map Tab ("A Dusty Path" in ADR)
     "ENGINEER","FARMER","CHARGING","D","E","F");
 
 // Sectors are base upgrades
@@ -585,6 +586,9 @@ export class TheColony extends UTILS.EventListener{
                 else{
                     // Feed the Meeple
                     this.resources[0] -= 1;
+                    // Add the used resource to the resources change
+                    if(typeof resources[0] == "undefined") resources[0]=0;
+                    resources[0]-=1;
                     meeple.hungerTimer.clearReady();
                 }
             }

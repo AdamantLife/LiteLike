@@ -3,8 +3,137 @@
 import { Character } from "./character.js";
 import * as UTILS from "./utils.js";
 
+/**
+ * Equipment types which are recorded by TheColony and Characters
+ * @typedef {Item | ItemType | Resource | ResourceType | Weapon | WeaponType} EQUIPMENTTYPE
+ */ 
+
 // Weapon Ranges
 export const weaponranges = UTILS.enumerate("MELEE", "RANGED", "LASER");
+
+/**
+ * An Array subtype which segments off the first nth elements and manipulates them according to
+ * special rules. It also ensures there are no empty slots outside of the first nth elements.
+ * 
+ * As part of enforcing these rules, Equipment.splice has been made Private: Equipment.insert and Equipment.remove should be used instead.
+ * Additionally, note that Equipment.push will never place any item into the loadout.
+ */
+export class Equipment extends Array{
+    /**
+     * Constructs a new Equipment instance.
+     * @param {Number} [loadout=0] - a number indices at the start of the array which are handled
+     *      using a special set of rules. Additionally, indices after loadout cannot be empty.
+     */
+    constructor(loadout=0){
+        super();
+        this.loadout = loadout;
+        this[loadout-1] = undefined;
+    }
+  
+    splice(...args){throw new Error("Unimplemented");}
+  
+    #splice(start, deleteCount, ...args){
+        super.splice(start, deleteCount, ...args);
+    }
+    
+    /**
+     * Splices the element into the Equipment Array. If the index is part of this.loadout,
+     * and there is an empty index before the end of the loadout then this will only shift
+     * the itermediate elements instead of the whole Array. If Index is greater than the
+     * current length, this function simply pushes the item into the array.
+     * @param {Number} index - The index to insert the item at.
+     * @param {*} item - The item to be inserted.
+     * @returns {Number} - The new length of the Equipment Array
+     */
+    insert(index,item){
+        // If index comes after our last element, only append it
+        if(index >= this.length) return this.push(item);
+        
+        // If the index is unoccupied (it is part of our loadout)
+        // just assign it and return
+        if(typeof this[index] == "undefined"){ this[index] = item; return this.length; }
+
+        // Otherwise, the index is occupied
+
+        // Rather than check if the index is in our loadout, we don't lose much
+        // by just assuming it might be, so prepare to shift the array
+        let shiftstart=index
+        // In the loadout, we want to shift _into_ empty spaces (replacing them)
+        // so we need to find the first empty space and assign it to shiftend
+        let shiftend = index+1;
+        // This gets skipped automatically if the index is after our loadout
+        while(shiftend < this.loadout-1){
+            if(typeof this[shiftend] == "undefined") break;
+            shiftend+=1;
+        }
+        // If we found an empty space inside of the loadout, remove that index
+        // from the Array
+        if(shiftend < this.loadout-1) this.#splice(shiftend, 1);
+        // Then we can simply add the given item into the index, shifting all
+        // elements down
+        this.#splice(shiftstart,0,item);
+        return this.length;
+    }
+
+    /**
+     * Removes the element at the given index from the Equipment Array. If the index is within
+     * the loadout, then the index is set to undefined. Otherwise, the Array is spliced so all
+     * elements after it are moved down one index.
+     * @param {Number} index - The index to remove
+     * @returns {Number} - The new length of the Equipment Array
+     */
+    remove(index){
+        if(index < this.loadout){
+            this[index] = undefined;
+            return this.length;
+        }
+        this.#splice(index, 1);
+        return this.length;
+    }
+
+    /**
+     * Given an Inventory Instance, Inventory Type, or Inventory Type ID
+     * return the first index which matches that object.
+     * @param {Object | Number} item - The Instance, Type, or ID to match against
+     */
+    findEquipmentIndex(equipment){
+        // To streamline a bit, we'll establish a callback and use findIndex
+        let finder;
+
+        // *Type Objects have ids: we'll convert it to an id
+        if(typeof equipment.id !== "undefined") equipment = equipment.id;
+
+        // The Object is (now) the id, which we can match against
+        if(!isNaN(equipment)){
+            finder = (item)=>item.type.id == equipment;
+        }
+        // Otherwise it should be an Instance
+        else{
+            // For the finder, we simply match the instance
+            finder = (item)=> item == equipment;
+
+        }
+
+        // Now we find the first index that successfully passes our finder method
+        return this.findIndex(finder);
+    }
+
+    /**
+     * Returns a slice of the Equipment's Loadout
+     * @returns {Array} - The slice of the Equipment's loadout
+     */
+    getLoadout(){
+        return this.slice(0,this.loadout);
+    }
+
+    /**
+     * Returns a slice of all items after the Equipment's Loadout
+     * @returns {Array} - The slice of all items after the Equipment's loadout
+     */
+    getAdditional(){
+        return this.slice(this.loadout)
+    }
+}
 
 /**
  * A superclass for stackable items (items with quantities) and have weight
@@ -279,7 +408,7 @@ export class Armor extends ShopItem{
 
 // NOTE- Combat is 1-on-1 and items can't target other equipment
 //          In a more complete game we could add things like "MULTIPLE" or "ITEM"
-const targets = UTILS.enumerate("SELF", "ENEMY");
+export const targets = UTILS.enumerate("SELF", "ENEMY");
 
 /**
  * Base class for Items
@@ -304,7 +433,6 @@ export class ItemType extends ShopItem{
     constructor(id, target, callback, isConsumable, cooldown, weight){
         super();
         this.id = id;
-        this.target = target;
         this.callback = callback;
         this.isConsumable = Boolean(isConsumable);
         this.cooldown = cooldown;

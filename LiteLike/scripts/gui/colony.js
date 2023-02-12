@@ -2,7 +2,8 @@
 import * as SITEGUI from "./site.js";
 import { getStrings, makeTranslationLookup } from "../io.js";
 import { MAXPOWER, sectors, TheColony } from "../colony.js";
-import { enumerate, invertCost} from "../utils.js";
+import { enumerate, invertCost, generateElementPath} from "../utils.js";
+import * as CHARACTER from "../character.js";
 
 /** DEVNOTE- this list needs to be maintained alongside the LANGUAGE jsons */
 const STRINGS = enumerate(
@@ -10,7 +11,7 @@ const STRINGS = enumerate(
     "COST",
     // Home Pages
     // Starts on SECTORS because the first tab's name is dynamically generated
-    "SECTORPAGE", "MEEPLEPAGE",
+    "SECTORPAGE", "MEEPLEPAGE", "MAPPAGE",
     // Home Admin Page, top line
     "ADDBATTERIES","RESIDENTS",
     // Home Admin Page, fieldset legends
@@ -32,7 +33,19 @@ const STRINGS = enumerate(
 
     // Meeple Page
     // Fieldset legends
-    "JOBS","INCOME"
+    "JOBS","INCOME",
+
+    // Map Page
+    // Travel Preparations
+    // Transport Info
+    "FUEL", "CAPACITY",
+    // Transport Cargo
+    "CARGO",
+    // Mech Fieldset Legend
+    "MECH",
+
+    // Loadouts
+    "WEAPONLOADOUT", "ITEMLOADOUT"
 )
 
 export class TheColonyGUI{
@@ -49,25 +62,52 @@ export class TheColonyGUI{
         this.currentpage = null;
 
         this.tempListeners = {
-            "shop": this.unlockShop.bind(this)
+            "shop": this.unlockShop.bind(this),
+            "map": this.unlockMap.bind(this)
         }
         this.colony.addEventListener("powerlevelmodified", this.updatePowerLevel.bind(this));
         this.colony.addEventListener("resourcesmodified", this.updateStatusbox.bind(this));
         this.colony.addEventListener("unlockadded", this.tempListeners.shop);
+
+        //These are bound in setupUI, but noted here for reference
+        // statpanel.addEventListener("dragstart", this.dragInventory.bind(this))
+        // statpanel.addEventListener("dragover", this.dragInventoryOver.bind(this));
+        // statpanel.addEventListener("drop", this.dropInventory.bind(this));
+
         // These are bound in setupShop, but noted here for reference
         // this.colony.addEventListener("itemsmodified", this.updateStatusbox.bind(this));
         // this.colony.addEventListener("weaponsmodified", this.updateStatusbox.bind(this));
         // this.colony.addEventListener("resourcesmodified", this.updateShop.bind(this));
+
+        this.colony.addEventListener("unlockadded", this.tempListeners.map);
         this.colony.addEventListener("noresources", this.flashResources.bind(this));
         this.colony.addEventListener("sectoradded", this.addSector.bind(this));
         this.colony.addEventListener("sectortriggered", this.sectorCollection.bind(this));
         this.colony.addEventListener("sectorexpanded", this.upgradeSector.bind(this));
+
         // This is bound in setupMeeple, but noted here for reference
         // this.colony.addEventListener("meeplemodified", this.updateMeeple.bind(this));
         // this.colony.addEventListener("unlockadded", this.updateJobsAvailable.bind(this));
         // this.colony.addEventListener("jobsmodified", this.updateJobs.bind(this));
+
         // This is bound in setupShop, but noted here for reference
         //this.game.PLAYER.addEventListener("equipmentchange", this.updateArmorTransport.bind(this));
+
+        // This is bound in setupTravelPrep, but noted here for reference
+        // mapPage.addEventListener("dragstart", this.dragInventory.bind(this));
+        // mapPage.addEventListener("dragover", this.dragInventoryOver.bind(this));
+        // mapPage.addEventListener("drop", this.dropInventory.bind(this));
+        // this.game.PLAYER.addEventListener("equipmentchange", this.updateMapTransport.bind(this));
+        // this.game.PLAYER.addEventListener("inventorychange", this.updateMapWeight.bind(this));
+        // this.game.PLAYER.addEventListener("weaponadded", this.updatePlayerInventory.bind(this));
+        // this.game.PLAYER.addEventListener("weaponremoved", this.updatePlayerInventory.bind(this));
+        // this.game.PLAYER.addEventListener("itemadded", this.updatePlayerInventory.bind(this));
+        // this.game.PLAYER.addEventListener("itemremoved", this.updatePlayerInventory.bind(this));
+        // this.game.PLAYER.addEventListener("resourceschange", this.updatePlayerInventory.bind(this));
+        // mapPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        // mapPage.querySelector("fieldset[data-cargo]").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        // this.colony.addEventListener("itemsmodified", this.updateMechAvailability.bind(this));
+        // this.colony.addEventListener("resourcesmodified", this.updateMechAvailability.bind(this));
     }
 
     get game() {return this.colony.game;}
@@ -146,6 +186,10 @@ export class TheColonyGUI{
         statpanel.insertAdjacentHTML('beforeend', `<div id="resourcesbox" class="statusbox"><div class="header">${this.game.UI.translate(this.game.UI.STRINGS.RESOURCES)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><table class="boldfirst quantitytable"><tbody></tbody></table></div></div>`)
         // Setup resourcebox hide/show
         SITEGUI.attachPanelResizeCallback(document.getElementById("resourcesbox"));
+        // Setup draggable callback
+        statpanel.addEventListener("dragstart", this.dragInventory.bind(this))
+        statpanel.addEventListener("dragover", this.dragInventoryOver.bind(this));
+        statpanel.addEventListener("drop", this.dropInventory.bind(this));
 
         let home = this.homecontent;
         // Setup Home Content: we initially setup for a brand new game, and can update later if
@@ -213,10 +257,22 @@ export class TheColonyGUI{
                 this.addSector({sector});
             }
         }
-        // If the Gampeplaysequence has the Shop unlocked, set it up
+        // If The Colony has the Shop unlocked, set it up
         if(!this.colony.checkUnlocks(["SHOP"]).length) this.setupShop();
         // If The Colony has the Residential Sector unlocked, set it up
         if(this.colony.sectors.indexOf(sectors.RESIDENTIAL) >= 0) this.setupMeeple();
+        // If The Colony has the Map unlocked, set it up
+        if(!this.colony.checkUnlocks(["MAP"]).length) this.setupTravelPrep();
+    }
+
+    /**
+     * Sets up the Sectors Tab on the Colony GUI
+     */
+    setupSectors(){
+        // Setup and register Sectors page
+        let home = this.homecontent;
+        home.insertAdjacentHTML('beforeend', `<div id="sectorsPage"><table><tbody id="sectortable"></tbody></table></div>`);
+        this.registerPage("sectors", this.translate(STRINGS.SECTORPAGE));
     }
 
     /**
@@ -228,26 +284,22 @@ export class TheColonyGUI{
         if(!this.colony.checkUnlocks(["SHOP"]).length) this.setupShop();
     }
 
-    setupSectors(){
-        // Setup and register Sectors page
-        let home = this.homecontent;
-        home.insertAdjacentHTML('beforeend', `<div id="sectorsPage"><table><tbody id="sectortable"></tbody></table></div>`);
-        this.registerPage("sectors", this.translate(STRINGS.SECTORPAGE));
-    }
-
+    /**
+     * Sets up the Shop (Trader) section on the Admin Page
+     */
     setupShop(){
         // Make sure to remove the listener because we already have it
         this.colony.removeEventListener("unlockadded", this.tempListeners.shop);
 
         // Add Items and Weapons to the sidebar
         let statpanel = this.statuspanel;
-        // Create Resource Panel
+        // Create Items Panel
         statpanel.insertAdjacentHTML('beforeend', `<div id="itemsbox" class="statusbox"><div class="header">${this.game.UI.translate(this.game.UI.STRINGS.ITEMS)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><table class="boldfirst quantitytable"><tbody></tbody></table></div></div>`)
-        // Setup resourcebox hide/show
+        // Setup itembox hide/show
         SITEGUI.attachPanelResizeCallback(document.getElementById("itemsbox"));
-        // Create Resource Panel
+        // Create Weapons Panel
         statpanel.insertAdjacentHTML('beforeend', `<div id="weaponsbox" class="statusbox"><div class="header">${this.game.UI.translate(this.game.UI.STRINGS.WEAPONS)}<button class="resize" style="margin-left: auto; margin-right:0px;"></button></div><div class="body"><table class="boldfirst quantitytable"><tbody></tbody></table></div></div>`)
-        // Setup resourcebox hide/show
+        // Setup weaponbox hide/show
         SITEGUI.attachPanelResizeCallback(document.getElementById("weaponsbox"));
 
         // Add listeners to update the sidebar
@@ -309,6 +361,9 @@ export class TheColonyGUI{
         this.updateArmorTransport({subtype:"transport", item: this.game.PLAYER.transport});
     }
 
+    /**
+     * Adds Resident Count to the Admin Page and sets up the Population Tab
+     */
     setupMeeple(){
         // Add resident count to admin page
         document.querySelector("#adminTopBar").insertAdjacentHTML('beforeend',`<div style="font-weight:bold;">
@@ -338,6 +393,80 @@ export class TheColonyGUI{
         this.updateJobsAvailable({});
         // Spoofing a meeplemodified event in order to prepopulate the population span
         this.updateMeeple({newmeeple:this.colony.meeples});
+    }
+
+    /**
+     * 
+     * @param {TheColonyEvent} event - The Colony's unlockadded event
+     */
+    unlockMap(event){
+        // The Colony now has the MAP unlock
+        if(!this.colony.checkUnlocks(["MAP"]).length) this.setupTravelPrep();
+    }
+
+    /**
+     * Sets up the Travel Preparation (Map) Tab
+     * DEVNOTE- The map itself is a popup which is created by interacting with the
+     *      Travel Prep Tab, so the Travel Prep Tab will always be in the background
+     *      while traveling the Overworld
+     */
+    setupTravelPrep(){
+        // Make sure to remover EventListener
+        this.colony.removeEventListener("unlockadded", this.tempListeners.map);
+        let home = this.homecontent;
+        let transport = this.game.PLAYER.transport;
+        let transportstrings = getStrings(this.game.STRINGS, transport);
+        home.insertAdjacentHTML('beforeend', `<div id="mapPage">
+<fieldset id="transport"><legend title="${transportstrings.flavor}">${transportstrings.name}</legend>
+<div><b>${this.translate(STRINGS.FUEL)}</b>:&nbsp;<span data-fuel>${transport.maxReactorPower}</span></div>
+<div><b>${this.translate(STRINGS.CAPACITY)}</b>:&nbsp;<span data-carry>${this.game.PLAYER.weight}</span>/<span data-capacity>${transport.capacity}</span></div>
+<fieldset data-cargo>
+    <legend>${this.translate(STRINGS.CARGO)}</legend>
+    <fieldset data-weapons><legend>${this.game.UI.translate(this.game.UI.STRINGS.WEAPONS)}</legend><div></div></fieldset>
+    <fieldset data-items><legend>${this.game.UI.translate(this.game.UI.STRINGS.ITEMS)}</legend><div></div></fieldset>
+    <fieldset data-resources><legend>${this.game.UI.translate(this.game.UI.STRINGS.RESOURCES)}</legend><div></div></fieldset>
+</fieldset>
+</fieldset>
+<fieldset id="loadout"><legend>${this.translate(STRINGS.MECH)}</legend>
+    <h3>${this.translate(STRINGS.WEAPONLOADOUT)}</h3>
+    <table><tbody class="loadout weapons">
+        <tr><td class="loadout" data-slot="0" draggable="true"></td><td></td><td class="loadout" data-slot="1" draggable="true"></td></tr>
+        <tr><td></td><td class="loadout" data-slot="2" draggable="true"></td><td></td></tr>
+        <tr><td class="loadout" data-slot="3" draggable="true"></td><td></td><td class="loadout" data-slot="4" draggable="true"></td></tr>
+    </tbody></table>
+    <h3>${this.translate(STRINGS.ITEMLOADOUT)}</h3>
+    <table><tbody class="loadout items">
+        <tr><td class="loadout" data-slot="0" draggable="true"></td><td class="loadout" data-slot="1" draggable="true"></td><td class="loadout" data-slot="2" draggable="true"></td></tr>
+    </tbody></table>
+</fieldset>
+</div>`);
+        this.registerPage("map", this.translate(STRINGS.MAPPAGE));
+
+        // The Travel Preparations section is populated by a combination of drag-and-drop and arrows
+        // Since the drag and drop functionality can be used in multiple places, mapPage is bound in general
+        let mapPage = document.getElementById("mapPage");
+        mapPage.addEventListener("dragstart", this.dragInventory.bind(this));
+        mapPage.addEventListener("dragover", this.dragInventoryOver.bind(this));
+        mapPage.addEventListener("drop", this.dropInventory.bind(this));
+        
+        // Make sure to update transport title when the Player's transport changes 
+        this.game.PLAYER.addEventListener("equipmentchange", this.updateMapTransport.bind(this));
+        // Update carry weight when the stuff the Player is carrying changes
+        this.game.PLAYER.addEventListener("inventorychange", this.updateMapWeight.bind(this));
+        // Update loadout and inventory when that changes
+        this.game.PLAYER.addEventListener("weaponadded", this.updatePlayerInventory.bind(this));
+        this.game.PLAYER.addEventListener("weaponremoved", this.updatePlayerInventory.bind(this));
+        this.game.PLAYER.addEventListener("itemadded", this.updatePlayerInventory.bind(this));
+        this.game.PLAYER.addEventListener("itemremoved", this.updatePlayerInventory.bind(this));
+        this.game.PLAYER.addEventListener("resourceschange", this.updatePlayerInventory.bind(this));
+
+        // Toggles for manipulating inventory quantities
+        mapPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        mapPage.querySelector("fieldset[data-cargo]").addEventListener("click", this.togglePlayerQuantity.bind(this));
+
+        // Update toggle arrows when colony inventory changes
+        this.colony.addEventListener("itemsmodified", this.updateMechAvailability.bind(this));
+        this.colony.addEventListener("resourcesmodified", this.updateMechAvailability.bind(this));
     }
 
     /**
@@ -457,7 +586,7 @@ export class TheColonyGUI{
                 // Need display info
                 let info = getStrings(this.game.STRINGS, this.game.ITEMS[`${type}s`][id]);
 
-                tbody.insertAdjacentHTML(`beforeend`, `<tr data-id="${id}"><td title="${info.flavor}">${info.name}</td><td data-qty></td></tr>`);
+                tbody.insertAdjacentHTML(`beforeend`, `<tr data-id="${id}" draggable="true"><td title="${info.flavor}">${info.name}</td><td data-qty></td></tr>`);
                 // We know where that element was inserted, so we don't have to query for it
                 row = tbody.lastElementChild;
             }
@@ -539,9 +668,9 @@ export class TheColonyGUI{
             // Jobs other than job.id==0 (Grow Food) can be toggled +- meeple
             // Grow food is the default Job, so it acts as the pool from which all
             // other jobs pull from
-            let toggle = `<td><table><tbody>
-            <tr><td class="plusmeeple"></td><td class="plusmeeple plustenmeeple"></td></tr>
-            <tr><td class="minusmeeple disabled"></td><td class="minusmeeple minustenmeeple disabled"></td></tr>
+            let toggle = `<td><table class="incrementer"><tbody>
+            <tr><td class="plus"></td><td class="plus plustenmeeple"></td></tr>
+            <tr><td class="minus disabled"></td><td class="minus minustenmeeple disabled"></td></tr>
         </tbody></table></td>`
             if(job.id == 0) toggle = ``;
 
@@ -701,9 +830,9 @@ export class TheColonyGUI{
         
         // Update minus arrows, if we don't have any meeple, can't subtract meeple
         if(newmeeple <= 0){
-            jobrow.querySelectorAll("td.minusmeeple").forEach((ele)=>ele.classList.add("disabled"));
+            jobrow.querySelectorAll("td.minus").forEach((ele)=>ele.classList.add("disabled"));
         }else{
-            jobrow.querySelectorAll("td.minusmeeple").forEach((ele)=>ele.classList.remove("disabled"));
+            jobrow.querySelectorAll("td.minus").forEach((ele)=>ele.classList.remove("disabled"));
         }
 
         // List of Incomes that will need to have their totals updated
@@ -778,12 +907,12 @@ export class TheColonyGUI{
         let freemeeple = jobtable.querySelector('tr[data-id="0"]>td[data-meeple]');
         freemeeple = parseInt(freemeeple.innerText);
         
-        // No free meeple, so disable all all plusmeeple arrows
+        // No free meeple, so disable all all plus arrows
         if(!freemeeple){
-            jobtable.querySelectorAll("td.plusmeeple").forEach((ele)=>ele.classList.add("disabled"));
+            jobtable.querySelectorAll("td.plus").forEach((ele)=>ele.classList.add("disabled"));
         }else{
             // Otherwise, we can atleast increment by 1
-            jobtable.querySelectorAll("td.plusmeeple").forEach((ele)=>ele.classList.remove("disabled"));
+            jobtable.querySelectorAll("td.plus").forEach((ele)=>ele.classList.remove("disabled"));
             // But if we have less than 10, we can't increment by 10
             if(freemeeple < 10) jobtable.querySelectorAll("td.plustenmeeple").forEach((ele)=>ele.classList.add("disabled"));
         }
@@ -1031,12 +1160,12 @@ export class TheColonyGUI{
     adjustJobMeeple(event){
         let ele = event.target;
         // This event can trigger on non-arrow elements since it is registered to the table's tbody
-        if(!ele.classList.contains("plusmeeple") && !ele.classList.contains("minusmeeple")) return;
+        if(!ele.classList.contains("plus") && !ele.classList.contains("minus")) return;
 
         let value;
         // Figure out whether this is a positive or negative value based on whether
-        // it has plusmeeple (if it doesn't, then it has minusmeeple)
-        if(ele.classList.contains("plusmeeple")) value = 1;
+        // it has plus (if it doesn't, then it has minusmeeple)
+        if(ele.classList.contains("plus")) value = 1;
         else value = -1;
         // Figure out if this is a x10 arrow
         // If it is, multiply value x10
@@ -1059,5 +1188,697 @@ export class TheColonyGUI{
         this.colony.assignJob(job, value);
     }
         
+    /**
+     * 
+     * @param {Event} event the dragstart event
+     */
+    dragInventory(event){
+        // We haven't unlocked the Map yet, so don't drag anything
+        if(this.colony.checkUnlocks(["MAP"]).length) return event.preventDefault();
+
+        // Make sure dataTransfer is empty
+        event.dataTransfer.clearData();
+
+        // Establish what the source is because that dictates what the droppable area is
+        // DEVNOTE- We're using the queryselector strings because moz is the only browser
+        //      type that supports storing nodes (x-moz-node)
+        let loadoutweapons= "#loadout tbody.loadout.weapons";
+        let loadoutitems= "#loadout tbody.loadout.items";
+        let transport = "#transport";
+        let statusweapons = "#weaponsbox";
+        let statusitems = "#itemsbox";
+        let statusresources = "#resourcesbox";
+
+        let src;
+        let path = generateElementPath(event.target);
+        for(let source of [loadoutweapons, loadoutitems, transport, statusweapons, statusitems, statusresources]){
+            // The dragged object is a child of the src
+            if(path.indexOf(document.querySelector(source))>=0){
+                // Store the source for future reference both locally and on the eventdata
+                src = source;
+                // DEVNOTE- This is, technically, an abuse of setData as all data in
+                //      dataTransfer should be synonomous with each other but this is
+                //      the simplest way to keep a reference for source and lets us
+                //      avoid setting up multiple drag callbacks
+                event.dataTransfer.setData("text/node",src);
+                break;
+            }
+        }
+        // We could not actually establish an origin
+        if(!src) return;
+        // We can only drag the toplevel spans from transport (to keep things from being confusing)
+        if(src == transport && (!event.target.dataset.type || typeof event.target.dataset.type == "undefined")){
+            // Stop us from dragging if the target is not a valid span (has type)
+            event.dataTransfer.clearData();
+            return event.preventDefault();
+        }
+
+        // Determine item type and index
+        // DEVNOTE- Type is relevant for two reasons: 1) the Transport can hold any item types, so we have
+        //      to establish what the item is now; and 2) we're not simply saving the item to event data.
+        //      If the Transport could only hold one type of item, then we only need to know the source.
+        //      If we saved the item data, then we could figure out what type it is by inspecting the item.
+        //      Index is relevant because of rearranging the weapons loadout
+        let type, id, index =-1, qty = 1;
+        switch(src){
+            case loadoutweapons:
+                type="weapon";
+                index = parseInt(event.target.dataset.slot);
+                id = this.game.PLAYER.weapons[index].type.id;
+                break;
+            case loadoutitems:
+                type="item";
+                index=parseInt(event.target.dataset.slot);
+                id = this.game.PLAYER.items[index].type.id;
+                qty = this.game.PLAYER.items[index].quantity;
+                break;
+            case statusweapons:
+                id= parseInt(event.target.dataset.id);
+                type="weapon";
+                qty = 1
+                break;
+            case statusitems:
+                id = parseInt(event.target.dataset.id);
+                type="item";
+                qty = Math.min(this.colony.getItem(id), 1);
+                break;
+            case statusresources:
+                id = parseInt(event.target.dataset.id);
+                type="resource";
+                qty = Math.min(this.colony.getResource(id), 1);
+                break;
+            case transport:
+                id = parseInt(event.target.dataset.id);
+                type = event.target.dataset.type;
+                index = event.target.dataset.index
+                // Weapons are singletons (qty always is 1)
+                if(type == "weapon") qty = 1;
+                // Othwerise get qty from player
+                else if(type == "item") qty = this.game.PLAYER.getItem(id).quantity;
+                else if(type == "resource") qty = this.game.PLAYER.resources[id];
+        }
+
+
+        // We don't actually have a qty to move
+        if(!qty){
+            // Notify Player
+            SITEGUI.flashText(event.target);
+            // Stop Drag
+            return event.preventDefault();
+        }
+
+        // Save info we need for the item (type and ID)
+        /**
+         *  DEVNOTE- The Dragover Callback wants to know the type, but cannot see values associated to types
+         *      therefore we are saving the type as part of the dataType (available to Dragover via dataTransfer.types)
+         */
+        event.dataTransfer.setData(`text/${type}`, `${id}/${index}/${qty}`);
+    }
+
+    /**
+     * Callback for the dragover event
+     * @param {Event} event - the dragover event
+     */
+    dragInventoryOver(event){
+        // We use dropping in "illegal" areas as a way to remove the item completely
+        // therefore always allow the user to drop
+        event.preventDefault();
+    }
+
+    /**
+     * Drops an inventory item in the give location
+     * @param {Event} event - the drop event
+     */
+    dropInventory(event){
+        // These are the valid areas where inventory can be dropped
+        let loadoutweapons= "#loadout tbody.loadout.weapons";
+        let loadoutitems= "#loadout tbody.loadout.items";
+        let transport = "#transport";
+        // The above as well as the following elements are sources
+        let statusweapons = "#weaponsbox";
+        let statusitems = "#itemsbox";
+        let statusresources = "#resourcesbox";
+
+        let src = event.dataTransfer.getData("text/node");
+
+        let type;
+        for(let itype of ["weapon", "item", "resource"]){
+            for(let ptype of event.dataTransfer.types){
+                if(ptype.endsWith(itype)){
+                    type = itype;
+                    break;
+                }
+            }
+            if(type) break;
+        }
+        if(!type) return;
+
+        let idindexqty = event.dataTransfer.getData(`text/${type}`);
+        let [id,index,qty] = idindexqty.split("/");
+        id = parseInt(id), index = parseInt(index), qty = parseInt(qty);
+
+        let player = this.game.PLAYER
+        let item;
+
+        // Note: We know we can drop where we're pointing right now because the dragOver event would prevent
+        //      us from dropping in the first place
+
+        // Since we're dropping it, remove the item from its source
+        // Trigger any appropriate callbacks to update the UI
+        // For Colony sources, create the item Instance
+        if(src == statusweapons){
+            // The weapon may have dropped while we were dragging
+            // If it did, don't do anything
+            if(this.colony.weapons[id] <=0) return;
+            // Otherwise, take 1x weapon from TheColony
+            this.colony.weapons[id]-=1;
+            this.colony.triggerEvent(TheColony.EVENTTYPES.weaponsmodified, {weaponchange: [[id, -1]]});
+            item = this.game.createEquipmentInstance("Weapon",id);
+        }else if(src == statusitems){
+            // The item may have dropped while we were dragging
+            // If it did, don't do anything
+            if(this.colony.items[id] <=0) return;
+            // Otherwise, take 1x item from TheColony
+            this.colony.items[id]-=1;
+            this.colony.triggerEvent(TheColony.EVENTTYPES.itemsmodified, {itemchange: [[id, -1]]});
+            // Defaults to qty 1
+            item = this.game.createEquipmentInstance("Item",id);
+        }else if(src == statusresources){
+            // The resource may have dropped while we were dragging
+            // If it did, don't do anything
+            if(this.colony.resources[id] <=0) return;
+            // Otherwise, take 1x resource from TheColony
+            this.colony.resources[id] -=1;
+            this.colony.triggerEvent(TheColony.EVENTTYPES.resourcesmodified, {resourcechange: [[id, -1]]});
+            // Defaults to qty 1
+            item = this.game.createEquipmentInstance("Resource",id);
+        }
+        else if(type=="weapon"){
+            item = player.removeWeapon(index);
+            player.triggerEvent("weaponremoved", {item, index});
+        }
+        else if(type == "item"){
+            let previousIndex;
+            [item, previousIndex] = player.removeItem(index);
+            player.triggerEvent("itemremoved", {item, index: previousIndex});
+        }
+        // Resource
+        else{
+            qty = player.getResource(id);
+            player.resources[id] = null;
+            // player.resources is a {id: qty} mapping, so convert what we have to a Resource Instance
+            item = this.game.createEquipmentInstance("Resource", id, qty);
+            player.triggerEvent("resourceschange", {resources:{[id]: -qty}});
+        }
+
+
+        let path = generateElementPath(event.target);
+        // We're keeping track of dropped, because if an item wasn't dropped it needs to be put
+        // into The Colony
+        let dropped = false;
+
+        // Item is being dropped in the weapons loadout and is a weapon
+        // (therefore this is a valid drop location)
+        if(path.indexOf(document.querySelector(loadoutweapons)) >= 0 && type == "weapon"){
+            let index = null;
+            // We need to determine the target slot, which is only available on the td
+            // (which have to find)
+            let ele = event.target
+            // We're going to set the table as our stop point to be safe`
+            while(ele.tagName !== "TABLE"){
+                if(typeof ele.dataset.slot !== "undefined"){
+                    index = parseInt(ele.dataset.slot);
+                    break;
+                }
+                ele = ele.parentElement;
+            }
+            // If we haven't found the slot, the default is the first (0) index
+            // NOTE- this means any weapon dropped inside the loadout but not inside
+            //      a loadout table cell will automatically become the first weapon
+            if(index == null) index = 0;
+            
+            // Adding a weapon to an occupied loadout slot will shift the array
+            // so we need to check if the array shifted afterwards
+            let initial = [...player.weapons];
+            // Add item to that index
+            player.addWeapon(item, index);
+            // We'll compare each index up until the first non-loadout weapon and trigger a change
+            // for each different one (at most only one weapon will be pushed into index > weapons.loadout)
+            for(let index = 0; index < player.weapons.loadout+1; index++){
+                let item = player.weapons[index];
+                if(item && typeof item !== "undefined" && initial[index]!=item){
+                    player.triggerEvent("weaponadded", {item, index});
+                }
+                
+            }
+            
+
+            dropped = true;
+        }
+
+        // Item is being dropped in the items loadout and is an item
+        // (therefore this is a valid drop location)
+        else if(path.indexOf(document.querySelector(loadoutitems)) >= 0 && type == "item"){
+            let index = null;
+            // We need to determine the target slot, which is only available on the td
+            // (which have to find)
+            let ele = event.target
+            // We're going to set the table as our stop point to be safe`
+            while(ele.tagName !== "TABLE"){
+                if(typeof ele.dataset.slot !== "undefined"){
+                    index = parseInt(ele.dataset.slot);
+                    break;
+                }
+                ele = ele.parentElement;
+            }
+            // If we haven't found the slot, the default is the first (0) index
+            // NOTE- this means any item dropped inside the loadout but not inside
+            //      a loadout table cell will automatically become the first item
+            if(index == null) index = 0;
+
+            // Adding a item to an occupied loadout slot will shift the array
+            // so we need to check if the array shifted afterwards
+            let initial = [...player.items];
+            let [newItem, existingIndex] = player.addItem(item, index);
+            // We'll compare each index up until the first non-loadout item and trigger a change
+            // for each different one (at most only one item will be pushed into index > items.loadout)
+            for(let index = 0; index < player.items.loadout+1; index++){
+                let item = player.items[index];
+                if(item && typeof item !== "undefined" && initial[index]!=item){
+                    player.triggerEvent("itemadded", {item, index});
+                }
+            }
+            
+            // The Player already had the item, so we need to update the
+            // UI to show that it was combined with this item
+            if(existingIndex){
+                player.triggerEvent("itemremoved", {item:newItem, index: existingIndex});
+            }
+
+            dropped = true;
+        }
+
+        // Item is being dropped in the Transport
+        else if(path.indexOf(document.querySelector(transport))>= 0){
+            // Figure out how to add it
+            if(type == "weapon"){
+                player.addWeapon(item);
+                // addWeapon without an index simply pushes, so the weapon's index is length-1
+                player.triggerEvent("weaponadded", {item, index: player.weapons.length -1});
+
+                dropped = true;
+            }
+            else if(type == "item"){
+                index = player.items.length;
+                // addItem will add the item's qty to any existing
+                // instance of the same ItemType and return that instance
+                // If the item already existed, it will return the existing index             
+                let previousIndex = null;
+                [item, previousIndex] = player.addItem(item, index);
+                if(previousIndex !== null){
+                    // The Player already had the item, so we need to update the
+                    // UI to show that it was combined with this item
+                    player.triggerEvent("itemremoved", {item, index:previousIndex});
+                }
+                // Update index to match the current position of the Item
+                index = player.getItem(item);
+                player.triggerEvent("itemadded", {item, index});
+
+                dropped = true;
+            }
+            // Resource
+            else{
+                player.addResource(item);
+                player.triggerEvent("resourceschange", {resources:{[item.type.id]: item.quantity}});
+
+                dropped = true;
+            }
+        }
+
+        // Inventory that was not dropped successfully is returned to The Colony
+        if(!dropped){
+            if(type == "weapon"){
+                // NOTE- qty should always be 1 here
+                this.colony.addWeapon(id, qty)
+                this.colony.triggerEvent("weaponsmodified", {weaponchange: [[id, qty]]});
+            }else if(type == "item"){
+                this.colony.addItem(id, qty);
+                this.colony.triggerEvent("itemsmodified", {itemchange: [[id, qty]]});
+            }else if(type == "resource"){
+                this.colony.addResource(id, qty);
+                this.colony.triggerEvent("resourcesmodified", {resourcechange: [[id, qty]]});
+            }
+        }
+
+        // Finally,  update weight (Spoofing an event)
+        this.updateMapWeight({eventtype:CHARACTER.Character.EVENTTYPES.inventorychange});
+    }
+
+    /**
+     * Update the Travel Preparations (Map Tab) Transport fieldset
+     * @param {CharacterEvent} event - The Character.equipmentchange event
+     */
+    updateMapTransport(event){
+        // Only listen for the "transport" subtype
+        if(event.subtype !== "transport") return;
+        let transport = this.game.PLAYER.transport;
+        let transportstrings = getStrings(this.game.STRINGS, transport);
+        document.querySelector("#transport>legend").innerText = transportstrings.name;
+        document.querySelector("#transport>legend").setAttribute("title", transportstrings.flavor);
+        document.querySelector("#transport span[data-fuel]").innerText = transport.maxReactorPower;
+        document.querySelector("#transport span[data-capacity]").innerText = transport.capacity;
+    }
+
+    /**
+     * Updates the Player's carry weight whenever its equipment changes
+     * @param {CharacterEvent} event - The Character.inventorychange event
+     */
+    updateMapWeight(event){
+        document.querySelector("#transport span[data-carry]").innerText = this.game.PLAYER.weight;
+    }
+
+    /**
+     * Updates the Mech's Loadout and/or Transports inventory based on what changed
+     * @param {CharacterEvent} event - One of: weaponadded, weaponremoved, itemadded, itemremoved
+     */
+    updatePlayerInventory(event){
+        let player = this.game.PLAYER;
+        // Delegate as necessary
+        if(event.eventtype.description == "weaponadded" || event.eventtype.description == "weaponremoved"){
+            // If it's part of the loadout, update loadout
+            if(event.index < player.weapons.loadout) this.updateLoadout("weapon", event.index);
+            // Otherwise, update transport
+            else this.reloadTransportType("weapon");
+            // If the weapon has ammo, make sure the ammo is available in the Transport Resources
+            if(event.item.type.ammunition){
+                // We'll spoof an event to call the update function
+                // NOTE- We need to include a change amount, since updateMechResources skips the resource
+                // if the change is 0: uMR ignores our fake change amount and reference the Player
+                // instead to find the quantity to display
+                this.updateMechResources({resources:{[event.item.type.ammunition]: 1}});
+            }
+
+        // See above notes
+        }else if(event.eventtype.description == "itemadded"|| event.eventtype.description == "itemremoved"){
+            if(event.index < player.items.loadout) this.updateLoadout("item", event.index);
+            else this.reloadTransportType("item");
+        }
+        // resourcechange
+        else this.updateMechResources(event);
+    }
+
+    /**
+     * Adds a quantity span and Toggle Arrows to an element. This function does not
+     *      add any callbacks to the element.
+     * @param {HTMLElement} element - A DOM Element to add the quantity elements to
+     * @param {Object} item - An Object (Item or Resource) to get the quantity from
+     * @param {Number} item.quantity - The Object should have a numeric quantity to display
+     */
+    addQuantity(element, item){
+        element.insertAdjacentHTML('beforeend',`: <span data-qty>${item.quantity}</span><table class="incrementer inline"><tbody>
+            <tr><td class="plus"></td>
+            <td class="minus"></td></tr>
+        </tbody></table>`);
+        // Disable minus if the object doesn't have a quantity
+        // NOTE- this should only happen when Weapon Ammo is automatically added
+        if(!item.quantity){
+            element.lastElementChild.querySelector("td.minus").classList.add("disabled");
+        }
+    }
+    
+    /**
+     * Updates the index's UI slot for the given loadout
+     * @param {"weapon" | "item"} type- The Equipment Type
+     * @param {Number} index - The Index to update
+     */
+    updateLoadout(type,index){
+        let slot = document.querySelector(`#loadout tbody.loadout.${type}s td[data-slot="${index}"]`);
+        // We're overwriting the slot, so clear it out
+        while(slot.lastElementChild) slot.lastElementChild.remove();
+
+        let equipment = this.game.PLAYER[type+"s"][index];
+
+        // Slot is empty on the Player
+        if(!equipment || typeof equipment == "undefined") return;
+
+        let strings = getStrings(this.game.STRINGS, equipment);
+        slot.insertAdjacentHTML('beforeend', `<span data-id="${equipment.type.id}" data-type="${type}" title="${strings.flavor}">${strings.name}</span>`);
+        // If it's an item, add the quantity and toggle buttons to it
+        if(type == "item") this.addQuantity(slot.lastElementChild, equipment);
+    }
+
+    /**
+     * Reloads the given bucket
+     * DEVNOTE- Because Equipment Arrays (Weapons, Items) shift indices as entries are removed (and potentially added)
+     *      it is easier to simply start from scratch whenever an new Instance is added.
+     * @param {String} type- The invenotry type to reload ("weapon", "item", "resource")
+     */
+    reloadTransportType(type){
+        let bucket = document.querySelector(`#transport fieldset[data-${type}s]`);
+        // Clear out the UI for the type
+        while(bucket.lastElementChild){
+            // Stop at legend
+            if(bucket.lastElementChild.tagName == "LEGEND") break;
+            bucket.lastElementChild.remove();
+        }
+        // We need to keep track of index specifically for weapons
+        // To keep our code uniform, we'll just do the same thing for all three types
+        let items, index;
+        // Transport only shows Weapons and Items that are not in loadout
+        if(type == "weapon"){
+            items = this.game.PLAYER.weapons.getAdditional();
+            // Loadout is a count and we start the below loop by incrementing
+            // so offset the count by 1 so when we increment we get the next index
+            index = this.game.PLAYER.weapons.loadout -1;
+        }
+        else if(type == "item"){
+            items = this.game.PLAYER.items.getAdditional();
+            // Loadout is a count and we start the below loop by incrementing
+            // so offset the count by 1 so when we increment we get the next index
+            index = this.game.PLAYER.items.loadout -1;
+        }
+        // Resources
+        else{
+            items = this.game.PLAYER.resources;
+            // resources start from 0, so we need to be at -1 before incrementing
+            index = 0;
+        }
+
+        for(let item of items){
+            index+=1
+            // Empty slot, skip (NOTE- should only happen for Resources)
+            if(!item || typeof item == "undefined") continue;
+            let strings = getStrings(this.game.STRINGS, item);
+            let insertHTML = `<span class="cargo" data-type="${type}" data-id="${item.type.id}" data-index="${index}" title="${strings.flavor}" draggable="true">${strings.name}${typeof item.qty !== "undefined" ? `<span data-qty>${qty}</span>`: ``}</span>`;
+            bucket.insertAdjacentHTML('beforeend', insertHTML);
+            // If it's an item, add the quantity and toggle buttons to it
+            if(type == "item") this.addQuantity(bucket.lastElementChild, item);
+        }
+    }
+
+    /**
+     * When resources are changed on the Player, update the resources displayed in the transport
+     * @param {CharacterEvent} event - The Character.resourceschange event
+     */
+    updateMechResources(event){
+        let player = this.game.PLAYER
+        let cargo = document.querySelector("#transport fieldset[data-resources]");
+        for(let [resource,qty] of Object.entries(event.resources)){
+            // Resource didn't actually change (shouldn't actually happen)
+            if(!qty) continue;
+            // Like in other places, we'll reference The Player's current total instead
+            qty = player.getResource(resource);
+            if(!qty){
+                let isWeaponAmmo = false;
+                // Check if this resource is weapon ammo
+                for(let weapon of player.weapons){
+                    // Weapon slot may be empty if its in the loadout
+                    if(!weapon || typeof weapon == "undefined") continue;
+                    if(weapon.weapontype.ammunition == resource){
+                        // We only need to find one right now
+                        isWeaponAmmo = true;
+                        break;
+                    }
+                }
+                // If the resource is not weapon ammo, remove it from the UI
+                // (weapon ammo is added to the cargo even if it's qty 0)
+                if(!isWeaponAmmo){
+                    let ele = cargo.querySelector(`span.cargo[data-type="resource"][data-id="${resource}"]`);
+                    ele.remove();
+                    // Since the ele is removed, we can move on to the next resource
+                    continue;
+                }
+            }
+            // qty may be null, so coerce it into 0
+            // NOTE- this should only happen for Weapon Ammo
+            if(!qty) qty = 0;
+            
+            // Otherwise add resource if necessary and update qty
+            // We only really need the qty span, so we'll fetch it specifically
+            let ele = cargo.querySelector(`span.cargo[data-type="resource"][data-id="${resource}"]>span[data-qty]`);
+
+            // No such span, so we (presumably) we need to add the full .cargo span
+            if(!ele || typeof ele == "undefined"){
+                // The resource from resourcechange is ID only
+                // Need readable strings to display, which in turn requires an object to generate them
+                let obj = this.game.ITEMS.resources[resource];
+                let strings = getStrings(this.game.STRINGS, obj);
+
+                // Resources should be kept in ID order, so determine which element
+                // this resource should be put infront of
+                let nextEle = null;
+                for(let sibling of cargo.children){
+                    // We've found the element we're supposed to go infront of, so we're done
+                    if(parseInt(sibling.dataset.id) > resource){
+                        nextEle = sibling;
+                        break;
+                    }
+                }
+                let insertHTML = `<span class="cargo" data-type="resource" data-id="${resource}" title="${strings.flavor}" draggable="true"> ${strings.name}</span>`;
+                // This resource goes at the end
+                if(!nextEle) cargo.insertAdjacentHTML('beforeend', insertHTML);
+                else nextEle.insertAdjacentHTML('beforebegin', insertHTML);
+
+                // Our inserted ele
+                ele = cargo.querySelector(`span.cargo[data-id="${resource}"]`)
+
+                // Add Quantity and Toggle arrows to it
+                this.addQuantity(ele, {quantity: qty});
+
+                // addQuantity only updates the minus arrow, so we need to update the plus arrow ourself
+                let colonyqty = this.colony.getResource(resource)
+                // colony.getResource returns undefined if the resource was never registered
+                if(typeof colonyqty == "undefined" || colonyqty <= 0) ele.querySelector("table.incrementer td.plus").classList.add("disabled");
+
+                // Newly created ele is up to date, so move on to next resource
+                continue;
+            }
+
+            // Otherwise, we can update the qty
+            ele.innerText = qty;
+        }
+
+        // Finally,  update weight (Spoofing an event)
+        this.updateMapWeight({eventtype:CHARACTER.Character.EVENTTYPES.inventorychange});
+    }
+
+    /**
+     * Updates Item/Resource Plus/Minus arrows based on resource availability on TheColony
+     * @param {TheColonyEvent} event - The resourcesmodified or itemsmodified event of TheColony
+     */
+    updateMechAvailability(event){
+        let type, callback;
+        if(event.eventtype.description == "resourcesmodified"){
+            type="resource";
+            callback = this.colony.getResource.bind(this.colony);
+        }
+        else if(event.eventtype.description == "itemsmodified"){
+            type="item"
+            callback = this.colony.getItem.bind(this.colony);
+        }
+
+        // As always, this should not happen and if it did
+        // we should really raise an Error instead
+        if(typeof type == "undefined") return;
+
+        let mapPage = document.getElementById("mapPage");
+
+        for(let [id, _] of event[`${type}change`]){
+            // Get the actual quantity on TheColony
+            let qty = callback(id);
+
+            if(qty<=0){
+                // If TheColony does not have any, disable PLus Arrows
+                mapPage.querySelectorAll(`[data-type=${type}][data-id="${id}"] table.incrementer .plus`).forEach(ele=>ele.classList.add("disabled"));
+            }else{
+                // If TheColony does have the object, make sure all Plus Arrows are enabled
+                mapPage.querySelectorAll(`[data-type=${type}][data-id="${id}"] table.incrementer .plus`).forEach(ele=>ele.classList.remove("disabled"));
+            }
+        }
+    }
+
+    /**
+     * If an arrow is clicked on mapPage, toggles that resource +-
+     * @param {Event} event - The onclick event
+     */
+    togglePlayerQuantity(event){
+        let ele = event.target;
+        let plus = ele.classList.contains("plus"), minus = ele.classList.contains("minus");
+        // We bind to everything, so make sure this callback is for an arrow
+        if(!plus && !minus) return;
+        // Do nothing if arrow is disabled
+        if(ele.classList.contains("disabled")) return;
+        
+        // Plus arrow increases amount, minus arrow decreases
+        let mod = plus ? +1: -1;
+
+        // Since we're targeting only the arrows we need to
+        // navigate up the tree to find what we're modifying
+        let topEle = null;
+        while(!topEle){
+            ele = ele.parentElement;
+            if(ele.dataset.type && typeof ele.dataset.type !== "undefined") topEle = ele;
+        }
+
+        let id = ele.dataset.id, type = ele.dataset.type;
+        let player = this.game.PLAYER;
+
+
+        // Make sure that the place we're taking from actually has
+        // quantity that we can take
+        let available = false;
+
+        // If we're adding to Player, we're taking from Colony
+        if(mod > 0){
+            if(type == "resource") available = this.colony.getResource(id) > 0;
+            else if (type == "item")  available = this.colony.getItem(id) > 0;
+        }
+        // Otherwise, we're taking from the Player
+        else{
+            if(type == "resource") available = Boolean(player.getResource(id));
+            else if(type == "item") available = Boolean(player.getItem(id));
+        }
+
+        // If we can't perform the action, do nothing
+        if(!available) return;
+
+        if(type == "resource"){
+            if(mod > 0){
+                this.colony.resources[id] -=1;
+                // Player.addResource requires an instance (which Colony does not have)
+                let obj = this.game.createEquipmentInstance("Resource", id, 1);
+                player.addResource(obj);
+                
+            }else {
+                player.resources[id] -= 1;
+                this.colony.resources[id]+=1;
+            }
+            // Our mod is relative to the player, so colony is the opposite of mod
+            this.colony.triggerEvent("resourcesmodified", {resourcechange: [[id, mod*-1]]});
+            player.triggerEvent("resourceschange", {resources: {[id]: mod}});
+        }else if(type == "item"){
+            let previousIndex;
+            if(mod > 0){
+                this.colony.items[id] -=1;
+                // Player.addItem requires an instance of the item
+                let obj = this.game.createEquipmentInstance("Item", id, mod);
+                [obj, previousIndex] = player.addItem(obj);
+
+                player.triggerEvent("itemadded", {item: obj, index: previousIndex});
+            }else {
+                // removeItem requires the exact Item Instance, so we need to get it
+                let obj = player.getItem(id);
+                // Remove a positive quantity only
+                // Update obj to match the removedItem
+                [obj, previousIndex] = player.removeItem(undefined, obj, Math.abs(mod));
+                this.colony.items[id]+=1;
+
+                player.triggerEvent("itemremoved", {item: obj, index: previousIndex});
+            }
+            // Our mod is relative to the player, so colony is the opposite of mod
+            this.colony.triggerEvent("itemsmodified", {itemchange: [[id, mod*-1]]});
+        }
+    }
+    
 }
 

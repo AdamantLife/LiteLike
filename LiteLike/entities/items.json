@@ -7,7 +7,8 @@
             "range": "MELEE",
             "shopPrerequisites":[],
             "shopCost":[],
-            "weight":1
+            "weight":1,
+            "ammunition": null
         },
         { 
             "damage": 2,
@@ -76,11 +77,19 @@
     ],
     "item":[
         {
-            "target": 0,
             "callback":"HEAL",
             "arguments":["ACTIVATOR",45],
             "isConsumable":true,
             "cooldown":1000,
+            "shopPrerequisites":[],
+            "shopCost":[],
+            "weight": 1
+        },
+        {
+            "callback":"DISABLERANDOM",
+            "arguments":[],
+            "isConsumable":true,
+            "cooldown":5000,
             "shopPrerequisites":[],
             "shopCost":[],
             "weight": 1

@@ -142,15 +142,16 @@ export class RewardsGui{
         function collect(item){
             // Add item to equipment.weapons
             if(item.constructor.name == "Weapon"){
-                player.equipment.weapons.push(item);
-                player.triggerEvent("equipmentchange", {subtype: "weapons", item});
+                let index = player.addWeapon(item)-1;
+                player.triggerEvent("weaponadded", {subtype: "weapons", item, index});
             } // Add itmem to equipment.items
             else if(item.constructor.name == "Item"){
-                player.addItem(item)
-                player.triggerEvent("itemschange", {[player.getItemIndex(item.itemtype.id)]: item.quantity});
+                let index;
+                [item, index] = player.addItem(item)
+                player.triggerEvent("itemadded", {item, index});
             }else if(item.constructor.name == "Resource"){
                 player.addResource(item);
-                player.triggerEvent("resourceschange", {[item.resourcetype.id]: item.quantity});
+                player.triggerEvent("resourceschange", {resources:{[item.resourcetype.id]: item.quantity}});
             }
         }
 

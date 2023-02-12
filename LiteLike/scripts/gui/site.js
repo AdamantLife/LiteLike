@@ -59,6 +59,7 @@ export function swellText(element, options){
  * @param {Element} panel - The button element to which this is attached to
  */
 export function attachPanelResizeCallback(panel){
+    let header = panel.querySelector(".header");
     let resize = panel.querySelector("button.resize");
     let body = panel.querySelector(".body")
     function callback(){
@@ -71,7 +72,7 @@ export function attachPanelResizeCallback(panel){
             body.classList.add("hidden");
         }
     }
-    resize.onclick = callback;
+    header.onclick = callback;
 }
 
 /**

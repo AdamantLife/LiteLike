@@ -1,6 +1,7 @@
 "use strict";
 
 import * as UTILS from "./utils.js";
+import {Equipment} from "./items.js";
 
 export const roles = UTILS.enumerate("PLAYER", "ENEMY", "CHARACTER", "ITEM");
 
@@ -41,7 +42,7 @@ class Entity extends UTILS.EventListener{
  * which should extend both Entity and EventListener
  */
 export class Character extends Entity{
-    static EVENTTYPES = UTILS.enumerate("equipmentchange", "itemschange", "resourceschange", "hpchange", "currentHPchange");
+    static EVENTTYPES = UTILS.enumerate("equipmentchange", "inventorychange", "weaponschange", "weaponremoved", "weaponadded", "itemschange", "itemadded", "itemremoved", "resourceschange", "hpchange", "currentHPchange");
     constructor(id, roles){
         super(Character.EVENTTYPES, id, roles);
     }
@@ -83,14 +84,17 @@ export class Character extends Entity{
     /**
      * Returns the first weapon with the given weapon id, or null if none are found
      * @param {Number} weapon - The weapon id to get
+     * @param {Boolean} [reverse=false] - if True, return the last weapon with id instead
      * @returns {Weapon | null} - Returns the weapon if they player has it, otherwise none
      */
-    getWeapon(weapon){
+    getWeapon(weapon, reverse = false){
         // Iterate over weapons
-        for(let weap of this.weapons){
+        for(let i = 0; i < this.weapons.length; i++){
+            let index  = i;
+            if(reverse) index = this.weapons.length - 1 - i;
             // If weapon id matches, return it
-            if (weap.weapontype.id == weapon){
-                return weap;
+            if (this.weapons[index].weapontype.id == weapon){
+                return this.weapons[index];
             }
         }
         // Null will be returned implicitly
@@ -116,12 +120,14 @@ export class Character extends Entity{
     /**
      * Checks the character's items list for the given item and returns it if the character has it
      * @param {Number} item - The item id to get
-     * @param {Boolean} returnEmpty- A boolean to indicating whether to return an empty item
+     * @param {Boolean} returnEmpty - A boolean to indicating whether to return an empty item
      * @returns {Item | null} - Returns the item if the player has it in non-zero quantity, otherwise null
      */
     getItem(item, returnEmpty = false){
         // Items are unsorted, so we'll have to dig through the whole backpack
         for(let it of this.items){
+            // Empty slot (in loadout)
+            if(!it || typeof it == 'undefined') continue;
             // If itemtype matches, return the Item Instance
             if(it.itemtype.id == item){
                 // If returnEmpty is false and we don't have any
@@ -137,7 +143,7 @@ export class Character extends Entity{
     /**
      * Returns the given resource if the Player has a positive quantity of it
      * @param {Number} resource - The resource ID to return
-     * @param {Boolean} returnEmpty- A boolean to indicating whether to return an empty resource
+     * @param {Boolean} returnEmpty - A boolean to indicating whether to return an empty resource
      * @returns {Resource | null} - 
      */
     getResource(resource, returnEmpty = false){
@@ -155,14 +161,42 @@ export class Character extends Entity{
      * Adds an item to the Character's equipment. If the character already
      * has the item, increases its quantity instead
      * @param {Item} item - The item to be added
+     * @param {index} [index=undefined] - If the item is not already in the Character's
+     *      equipment, the item will be inserted at the given index
+     * @returns {[Item, Number]} - Returns the item as it exists on the character as the
+     *      first element. If the item was moved, the second element will be the previous
+     *      index of the element.
      */
-    addItem(item){
+    addItem(item, index=undefined){
+        let previous = null;
         // Check if we already have it
         let existing = this.getItem(item.itemtype.id, true);
-        // Just add it if we don't have it
-        if(!existing) return this.items.push(item);
+        if(existing) previous = this.items.findEquipmentIndex(existing);
+        // If index provided and in loadout but we already have the
+        // item in our inventory, we need to take it out in order to
+        // put it in the right place
+        if(existing && typeof index !== 'undefined'){
+            // Remove
+            this.removeItem(undefined, existing);
+            // Add existing qty to item qty
+            item.quantity += existing.quantity;
+            // Item no longer exists in our items bag
+            existing = false;
+        }
+        
+        // If the item is not (now) in our item bag, we'll go about adding it
+        if(!existing){
+            // If index is provided, insert the item at that index
+            if(typeof index !== "undefined"){
+                this.items.insert(index, item);
+            }
+            // Otherwise, push the item into the equipment
+            else this.items.push(item);
+            return [item, previous];
+        }
         // Otherwise, we need to update our item
         existing.quantity += item.quantity;
+        return [existing, previous];
     }
 
     /**
@@ -174,9 +208,100 @@ export class Character extends Entity{
         // Check if we already have it
         let existing = this.getResource(resource.resourcetype.id, true);
         // Just add it if we don't have it
-        if(!existing) return this.resources[resource.resourcetype.id] = resource;
+        if(!existing){
+            this.resources[resource.resourcetype.id] = 0;
+        }
         // Otherwise, we need to update our item
-        existing.quantity += resource.quantity;
+        this.resources[resource.resourcetype.id] += resource.quantity;
+        return this.resources[resource.resourcetype.id];
+    }
+
+    /**
+     * Adds the given weapon to the Character's weapons array. If index is provided, it will be placed at that index.
+     * @param {*} weapon - The weapon to be added
+     * @param {*} [index] - The index to add the weapon at; if not provided the weapon will be pushed into the equipment
+     * @returns 
+     */
+    addWeapon(weapon, index){
+        // Insert weapon at index if provided
+        if(typeof index !== 'undefined') this.weapons.insert(index, weapon);
+        // Otherwise, push it
+        else this.weapons.push(weapon);
+    }
+
+    /**
+     * Removes a weapon by Index, Type, Type ID, or Instance. If index is not provided
+     * then the first weapon matching the given weapon will be removed.
+     * @param {Number} [index] - A specific index to remove
+     * @param {Weapon | WeaponType | Number} [weapon] - A Weapon Instance, Weapon Type, or Weapon Type ID to match
+     * @returns {Weapon | null} - The Weapon Instance removed (or null if such a Weapon cannot be removed)
+     */
+    removeWeapon(index, weapon){
+        // Weapon was supplied, so try to find the index of that weapon
+        if(typeof index == "undefined"){
+            index = this.weapons.findEquipmentIndex(weapon);
+        }
+        
+        // No such weapon to remove therefore no index
+        // Or index provided was invalid due to absence of a weapon
+        if(index === null || index < 0 || !this.weapons[index] || typeof this.weapons[index] == "undefined" ) return;
+
+        // Weapon/Index mismatch
+        // NOTES- Should only happen if weapon and index were both provided by the caller
+        //      - As usual, should be an error
+        if(weapon && this.weapons[index].type.id != weapon) return;
+
+        // Save a reference to the weapon we're removing for the return
+        weapon = this.weapons[index];
+        this.weapons.remove(index);
+
+        // Return removed Weapon Instance
+        return weapon;
+    }
+
+    /**
+     * Removes an Item by Index, Type, Type ID, or Instance. If index is not provided
+     * then the first weapon matching the given weapon will be removed.
+     * @param {Number} [index] - A specific index to remove
+     * @param {Item | ItemType | Number} [item] - An Item Instance, Item Type, or Item Type ID to match
+     * @param {Number} [qty] - An quantity to remove from the Item; if omitted, the entire Item will be removed
+     * @returns {[Item | null, Number | null]} - Returns a length-2 array with the Item Instance removed (or null
+     *      if such an Item cannot be removed) and the Index it was removed from (or null if it wasn't removed)
+     */
+    removeItem(index, item, qty){
+        // Item was supplied, so try to find the index of that item
+        if(typeof index == "undefined"){
+            // Now we find the first index that successfully passes our finder method
+            index = this.items.findEquipmentIndex(item);
+        }
+        // No such item to remove therefore no index
+        // Or index provided was invalid due to absence of a weapon
+        if(index === null || index < 0 || !this.items[index] || typeof this.items[index] == "undefined" ) return [null, null];
+
+        // Item/Index mismatch
+        // NOTES- Should only happen if item and index were both provided by the caller
+        //      - As usual, should be an error
+        if(item && this.items[index].type.id != item.type.id) return [null, null];
+
+        // If qty is not provided, fully remove the item
+        if(typeof qty == "undefined"){
+            item = this.items[index];
+            this.items.remove(index);
+        }
+        // Otherwise, simply removed the required qty
+        else{
+            // Make sure we don't remove more qty than we have
+            let rmvqty = Math.min(qty, this.items[index].quantity);
+            // Create a new Item Instance to return with the removed qty
+            item = this.items[index].new(rmvqty);
+            // Remove the qty from the inventoried Item
+            this.items[index].quantity -= rmvqty;
+            // If the item no longer has a quantity, automatically drop it
+            if(!this.items[index].quantity) this.items.remove(index);
+        }
+
+        // Return the removed (qty of the) Item Instance
+        return [item, index];
     }
 
     /**
@@ -248,17 +373,29 @@ export class PlayerCharacter extends Character{
         // Including some default stats
         this.statistics = Object.assign({hp: 5, currentHP: 5, vision: 3}, statistics);
 
-        let weapons = [];
+        let weapons = new Equipment(CHARAWEAPONLOADOUT);
         // If there are weapons in equipment, copy the array over
-        if(equipment.hasOwnProperty("weapons") && equipment.weapons) weapons = Array.from(equipment.weapons);
+        if(equipment.hasOwnProperty("weapons") && equipment.weapons){
+            let weapon;
+            for(let i = 0; i < equipment.weapons.length; i++){
+                weapon = equipment.weapons[i];
+                if(weapon && typeof weapon !== 'undefined') weapons.insert(i, weapon);
+            }
+        }
 
         let armor = null;
         // If there is armor, set the Character's armor to that armor
         if(equipment.hasOwnProperty("armor") && equipment.armor) armor = equipment.armor;
 
-        let items = [];
+        let items = new Equipment(CHARAITEMLOADOUT);
         // If there are items in equipment, copy the array over
-        if(equipment.hasOwnProperty("items") && equipment.items) items = Array.from(equipment.items);
+        if(equipment.hasOwnProperty("items") && equipment.items){
+            let item;
+            for(let i = 0; i < equipment.items.length; i++){
+                item = equipment.items[i];
+                if(item && typeof item !== 'undefined') items.insert(i, item);
+            }
+        }
 
         let transport = null;
         // If there is transport, set the Character's transport to that transport
@@ -284,9 +421,10 @@ export class PlayerCharacter extends Character{
      */
     get weight(){
         let weight = 0;
-        for(let weapon of this.equipment.weapons) weight+= weapon.weapontype.weight;
-        for(let item of this.equipment.items) weight += item.totalWeight;
-        for(let resource of Object.values(this.equipment.resources)) weight += resource.totalWeight;
+        // Note- Buckets may have empty indices, so need to check first
+        for(let weapon of this.equipment.weapons) weight+= weapon ? weapon.weapontype.weight : 0;
+        for(let item of this.equipment.items) weight += item ? item.totalWeight: 0;
+        for(let resource of Object.values(this.equipment.resources)) weight += resource ? resource.totalWeight: resource;
         return weight;
     }
 
@@ -323,9 +461,9 @@ export class CombatCharacter extends Character{
 
         this.statistics = statistics;
 
-        let weapons = [];
+        let weapons = Array.apply(null, Array(CHARAWEAPONLOADOUT)).map(function () {});
         // If there are weapons in equipment, use that value
-        if(equipment.hasOwnProperty("weapons")) weapons = equipment.weapons;
+        if(equipment.hasOwnProperty("weapons")) weapons = equipment.weapons.getLoadout();
         this.weapons = weapons;
 
         let armor = null;
@@ -333,9 +471,9 @@ export class CombatCharacter extends Character{
         if(equipment.hasOwnProperty("armor")) armor = equipment.armor;
         this.armor = armor;
 
-        let items = [];
+        let items = Array.apply(null, Array(CHARAITEMLOADOUT)).map(function () {});
         // If there are items in equipment, use that value
-        if(equipment.hasOwnProperty("items")) items = equipment.items;
+        if(equipment.hasOwnProperty("items")) items = equipment.items.getLoadout();
         this.items = items;
 
         let resources = {};
@@ -351,9 +489,12 @@ export class CombatCharacter extends Character{
      *                              Character's weapons, or null if it has none
      */
     randomWeapon(random){
-        if(!this.weapons.length) return null;
+        // Only pick from available weapons
+        let weapons = this.weapons.filter(weapon=>weapon && typeof weapon !== "undefined");
+        // No available weapons
+        if(!weapons.length) return null;
         if(typeof random == "undefined") random = Math.random;
-        return UTILS.randomChoice(this.weapons, random);        
+        return UTILS.randomChoice(weapons, random);
     }
 
     /**
@@ -361,12 +502,13 @@ export class CombatCharacter extends Character{
      * @param {Number} now- Performance.now
      */
     updateWeapons(now){
-        for(let weapon of this.weapons.slice(0,CHARAWEAPONLOADOUT)){
+        for(let index = 0; index< this.weapons; index++){
+            let weapon = this.weapons[index];
             let cooldown = weapon.cooldown.isReady;
             let warmup = weapon.warmup.isReady;
             weapon.updateTimers(now);
-            if(weapon.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {subtype: "timer", item: weapon, timer: "cooldown"});
-            if(weapon.warmup.isReady != warmup) this.triggerEvent(Character.EVENTTYPES.equipmentchange, {subtype: "timer", item: weapon, timer: "warmup"});
+            if(weapon.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.weaponchange, {subtype: "timer", item: weapon, timer: "cooldown", index});
+            if(weapon.warmup.isReady != warmup) this.triggerEvent(Character.EVENTTYPES.weaponchange, {subtype: "timer", item: weapon, timer: "warmup", index});
         }
     }
 
@@ -375,7 +517,7 @@ export class CombatCharacter extends Character{
      * @param {Number} now - Performance.now
      */
     updateItems(now){
-        for(let item of this.items.slice(0,CHARAITEMLOADOUT)){
+        for(let item of this.items){
             let cooldown = item.cooldown.isReady;
             item.updateTimer(now);
             if(item.cooldown.isReady != cooldown) this.triggerEvent(Character.EVENTTYPES.itemschange, {subtype: "timer", item, timer: "cooldown"});

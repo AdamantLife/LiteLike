@@ -447,3 +447,19 @@ export class Timer {
 export function invertCost(cost){
     return cost.map(([resource,qty])=>[resource, -qty]);
 }
+
+
+/**
+ * Returns all ancestor elements from the given element to the Document(html element).
+ * @param {Element} ele - The element whose path to construct
+ * @returns {Element[]} - All elements between the given element and it's Document (excluding the provided Element itself).
+ */
+export function generateElementPath(ele){
+    let result = [];
+    let current = ele;
+    while(current.parentElement){
+        current = current.parentElement;
+        result.push(current);
+    }
+    return result;
+}

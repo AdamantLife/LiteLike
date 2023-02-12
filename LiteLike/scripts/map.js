@@ -152,7 +152,7 @@ export class Map extends UTILS.EventListener{
         // NOTE - There didn't seem to be a cost-difference for terrain type in A Dark Room
         //          If there was, we would calclulate that here
         this.player.equipment.transport.reactorPower -= MOVEFUELCOST;
-        this.player.triggerEvent(PlayerCharacter.EVENTTYPES.equipmentchange, {transport:this.player.equipment.transport});
+        this.player.triggerEvent(PlayerCharacter.EVENTTYPES.equipmentchange, {subtype:"fuel", transport:this.player.equipment.transport});
         // Subtract required repair cost
         // Repairbots are always the first (0-index) item
         this.player.equipment.items[0].quantity -= MOVEREPAIRCOST;

@@ -20,6 +20,8 @@ export class GameplaySequence{
         "FIRSTSCRAP",
         // Unlock Residential
         "FIRSTBATTERY",
+        // Unlocks Map
+        "FIRSTTRANSPORT",
 
         // Unlock Events
         "CHARGINGUNLOCK"
@@ -112,17 +114,19 @@ export class GameplaySequence{
         this.listeners = {
             "plm": this.firstPower.bind(this),
             "mm": this.firstMeeple.bind(this),
+            "tp": this.firstTransport.bind(this),
             "ua": (event)=>this.checkState(event, "unlock"),
             "sa": (event)=>this.checkState(event, "sector"),
-            "rp": (event)=>this.checkState(event, "resource"),
-            "rc": (event)=>this.checkState(event, "resource"),
+            "rc": (event)=>this.checkState(event, "cresource"),
+            "rp": (event)=>this.checkState(event, "presource"),
         };
         this.game.COLONY.addEventListener("powerlevelmodified", this.listeners.plm);
         this.game.COLONY.addEventListener("meeplemodified", this.listeners.mm);
+        this.game.PLAYER.addEventListener("equipmentchange", this.listeners.tp);
         this.game.COLONY.addEventListener("unlockadded", this.listeners.ua);
         this.game.COLONY.addEventListener("sectoradded", this.listeners.sa);
         this.game.COLONY.addEventListener("resourcesmodified", this.listeners.rc);
-        this.game.PLAYER.addEventListener("resourcesmodified", this.listeners.rp);
+        this.game.PLAYER.addEventListener("resourceschange", this.listeners.rp);
     }
 
     /**
@@ -328,8 +332,11 @@ export class GameplaySequence{
         // as default
         let lookupValues = [];
         if(type == "unlock" || type == "sector") lookupValues.push(event[type]);
-        else if(type == "resource"){
+        else if(type == "cresource"){
             for(let [resourceid, qty] of event.resourcechange) lookupValues.push(resourceid);
+        }
+        else if(type == "presource"){
+            for(let resourceid of Object.keys(event.resources)) lookupValues.push(resourceid);
         }
 
         for(let lookupValue of lookupValues){
@@ -402,7 +409,7 @@ export class GameplaySequence{
                 sender = this.game.COLONY;
                 callback = this.listeners.ua;
                 break;
-            case "equipmentchange":
+            case "resourceschange":
                 sender = this.game.PLAYER;
                 callback = this.listeners.rp;
                 break;
@@ -487,7 +494,7 @@ export class GameplaySequence{
     }
 
     /**
-     * When the Player 
+     * When the Colony gets its first Meeple, unlock Colony Event and setNextColonyTimeout (see generateColonyEvent)
      */
     firstMeeple(event){
         // We already have the ColonyEvents flag, so remove listener and return without doing anything
@@ -498,6 +505,22 @@ export class GameplaySequence{
         this.setNextColonyTimeout();
         // Make sure to remove listener so we don't keep triggering this event
         this.game.COLONY.removeEventListener("meeplemodified",this.listeners.mm);
+    }
+
+    /**
+     * When the Player gets his first transport, unlock the Cargo Bay (access to the Overworld Map)
+     */
+    firstTransport(event){
+        // The Colony already has the Map unlocked, so remove listener and do nothing
+        if(!this.game.COLONY.checkUnlocks(["MAP"]).length) return this.game.PLAYER.removeEventListener("equipmentchange", this.listeners.tp);
+        // Check to make sure it's the right event (transport)
+        if(!event.subttype == "transport") return;
+        // Unlock Map on Colony
+        this.game.COLONY.unlock("MAP");
+        // Give the Player feedback
+        this.game.MESSAGELOG.addMessage(this.translate(this.STRINGS.FIRSTTRANSPORT))
+        // Remove Listener
+        this.game.PLAYER.removeEventListener("equipmentchange", this.listeners.tp);
     }
 
     /** COLONY UNLOCK EVENTS
