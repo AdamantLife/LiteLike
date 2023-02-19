@@ -4,6 +4,15 @@ import * as ENCOUNTERS from "../encounters.js";
 import * as COMBATGUI from "./combat.js";
 import * as REWARDSGUI from "./reward.js";
 
+export function getSetupEventbox(){
+    let eventbox = document.getElementById("events");
+    if(!eventbox){
+        document.getElementById("gamewindow").insertAdjacentHTML('afterbegin', `<div id="events" class="popup hidden"></div>`);
+        eventbox = document.getElementById("events");
+    }
+    return eventbox;
+}
+
 /**
  * Convenience function to clear the Event Popup (before populating)
  * and return a reference to it for use
@@ -12,7 +21,7 @@ import * as REWARDSGUI from "./reward.js";
  */
  export function clearEvents(){
     // Get Box
-    let eventBox = document.getElementById("events");
+    let eventBox = getSetupEventbox();
     // Clear box of all child elements
     while(eventBox.lastElementChild) eventBox.lastElementChild.remove();
     // Return so calling function doesn't have to look for it
@@ -24,7 +33,7 @@ import * as REWARDSGUI from "./reward.js";
  * Makes sure the #events div is shown
  */
 export function showEvents(eventBox){
-    if(!eventBox || typeof eventBox == "undefined") eventBox = document.getElementById("events");
+    if(!eventBox || typeof eventBox == "undefined") eventBox = getSetupEventbox();
 
     // If box is hidden, remove hidden
     if(eventBox.classList.contains("hidden")) eventBox.classList.remove("hidden");
@@ -42,8 +51,8 @@ export function showEvents(eventBox){
  */
 export function updateSequenceGUI(encounter){
 
-    let eventBox = document.getElementById("events");
-    let combatBox = document.getElementById("combat");
+    let eventBox = getSetupEventbox();
+    let combatBox = COMBATGUI.getSetupCombatbox();
     // Establish any popups are currently visible so we know how to handle them
     let currentPopups = {
         combat: combatBox.classList.contains("shown"),

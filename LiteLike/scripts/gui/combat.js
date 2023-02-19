@@ -18,12 +18,21 @@ import * as GUI from "./site.js";
  * @param { null | Number } damage - If the result is damage, how much damage is going to be done (without event interference)
  */
 
+export function getSetupCombatbox(){
+    let combatBox = document.getElementById("combat");
+    if(!combatBox){
+        document.getElementById("gamewindow").insertAdjacentHTML('afterbegin', `<div id="combat" class="popup hidden"></div>`);
+        combatBox = document.getElementById("combat");
+    }
+    return combatBox;
+}
+
 /**
      * Clears the Combat Div and returns a reference to it
      * @returns {Element} - The Combat Div
      */
  export function clearCombat(){
-    let combatBox = document.getElementById("combat");
+    let combatBox = getSetupCombatbox();
     while (combatBox.lastElementChild) combatBox.lastElementChild.remove();
     return combatBox;
 }
@@ -213,7 +222,7 @@ export class CombatGui{
      * to the Combat Popup
      */
     loadCombat(){
-        let combatBox = document.getElementById("combat");
+        let combatBox = getSetupCombatbox();
         let player = this.combat.player;
         let enemy = this.combat.enemy;
         // Setup the Combat div
@@ -257,7 +266,7 @@ export class CombatGui{
      */
     startCombat(event){
         // Stop listening for animations on Combat
-        document.getElementById("combat").removeEventListener("animationend", this.startCombat.bind(this));
+        getSetupCombatbox().removeEventListener("animationend", this.startCombat.bind(this));
         // Start Combatloop
         this.combat.combatLoop();
     }

@@ -417,6 +417,26 @@ export class MessageEncounter extends Encounter{
 }
 
 /**
+ * Creates an Encounter Sequence of Message Encounters
+ * @param {Game} game - The Game object to associate each Encounter with
+ * @param {String[]} messages - An array of message strings, each will be converted into its own Message Encounter
+ * @returns {EncounterSequence} - The Sequence containing the Message Encounters
+ */
+export function buildMessageSequence(game, messages){
+    /// Messages are required
+    // As you might expect, this normally should be an error
+    if(!messages || typeof messages == "undefined" || !messages.length) return;
+
+    // Create a new sequence
+    let sequence = new EncounterSequence();
+    for(let message of messages){
+        // Add each message as a MessageEncounter to the Sequence
+        sequence.addEncounter(new MessageEncounter({game, message}));
+    }
+    return sequence;
+}
+
+/**
  * Creates a new Combat Encounter Sequence which is a CombatEncounter followed by a RewardEncounter. Unspecified values are randomized.
  * @param {Game} game - The game object to get statistics from
  * @param {Character | null} enemy - Enemy ID to fight. Null will produce a random tier 1 encounter

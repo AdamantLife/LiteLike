@@ -42,9 +42,21 @@ class Entity extends UTILS.EventListener{
  * which should extend both Entity and EventListener
  */
 export class Character extends Entity{
-    static EVENTTYPES = UTILS.enumerate("equipmentchange", "inventorychange", "weaponschange", "weaponremoved", "weaponadded", "itemschange", "itemadded", "itemremoved", "resourceschange", "hpchange", "currentHPchange");
-    constructor(id, roles){
+    static EVENTTYPES = UTILS.enumerate("equipmentchange", "inventorychange",
+    "weaponschange", "weaponremoved", "weaponadded",
+    "itemschange", "itemadded", "itemremoved",
+    "resourceschange",
+    "hpchange", "currentHPchange");
+
+    /**
+     * @param {Number} id - The enumerated id of this specific Entity
+     * @param  {Symbol[]} roles - A list of roles to add to this Entity on creation.
+     *                             Character is automatically added.
+     * @param {Game} game - The Game Object the Character belongs to
+     */
+    constructor(id, roles, game){
         super(Character.EVENTTYPES, id, roles);
+        this.game = game
     }
 
     /**
@@ -108,9 +120,12 @@ export class Character extends Entity{
     getItemIndex(item){
         // Iterate over items to find the item
         for(let i = 0; i < this.items.length; i++){
+            let slot = this.items[i];
+            // Nothing at that index, so skip it
+            if(!slot || typeof slot == "undefined") continue;
             // Check if itemid is the one we're looking for
             // Return the current index if it is
-            if(this.items[i].itemtype.id == item) return i;
+            if(slot.itemtype.id == item) return i;
         }
 
         // Item not found, so return -1
@@ -137,24 +152,31 @@ export class Character extends Entity{
                 return it;
             }
         }
-        // At this point, we did not find it, so null will be returned implicitly
+        // We didn't find it, so if we don't have to return an empty Instance, return null
+        if(!returnEmpty) return null;
+        // Otherwise we need to create the instance
+        return this.game.createEquipmentInstance("Item", item, 0);
     }
 
     /**
      * Returns the given resource if the Player has a positive quantity of it
      * @param {Number} resource - The resource ID to return
-     * @param {Boolean} returnEmpty - A boolean to indicating whether to return an empty resource
-     * @returns {Resource | null} - 
+     * @param {Boolean} [returnEmpty=false] - A boolean to indicating whether to return an empty resource Instance.
+     *                                          If false, returns null when the resource has no quantity.
+     * @returns {Resource | null} - Either a Resource Instance (if the Player has a positive quantity, or if returnEmpty is true)
+     *                                  otherwise null (no quantity and returnEmpty is false)
      */
     getResource(resource, returnEmpty = false){
         // Resources are sorted, so we can just get the corresponding index
         let r = this.resources[resource];
         // If the resources is not in our resources array, return null
         // Also return null if we don't have any quantity of the resource and we're not supposed to returnEmpty
-        if(!r || typeof r == "undefined" || (r.quantity <= 0 && returnEmpty)) return null;
+        if( (!r || typeof r == "undefined" || r.quantity <= 0) && !returnEmpty) return null;
 
-        // Otherwise, return it
-        return r;
+        // Otherwise we need to create the instance
+        // If r is null or undefined (which means that returnEmpty is true) convert it to 0
+        if(!r || typeof r == "undefined") r = 0;
+        return this.game.createEquipmentInstance("Resource", resource, r);
     }
 
     /**
@@ -168,10 +190,17 @@ export class Character extends Entity{
      *      index of the element.
      */
     addItem(item, index=undefined){
-        let previous = null;
-        // Check if we already have it
-        let existing = this.getItem(item.itemtype.id, true);
-        if(existing) previous = this.items.findEquipmentIndex(existing);
+        // NOTE- we're getting the index first because getItem(id, returnEmpty = true)
+        //  can't distinguish between Quantity 0 and Undefined
+        let previousIndex = this.getItemIndex(item.itemtype.id);
+        let existing = null;
+        if(previousIndex>=0){
+            // Get Item from Index
+            existing = this.items[previousIndex];
+        } else{
+            // If no previous index (-1), just set it to null instead
+            previousIndex = null;
+        }
         // If index provided and in loadout but we already have the
         // item in our inventory, we need to take it out in order to
         // put it in the right place
@@ -192,11 +221,11 @@ export class Character extends Entity{
             }
             // Otherwise, push the item into the equipment
             else this.items.push(item);
-            return [item, previous];
+            return [item, previousIndex];
         }
         // Otherwise, we need to update our item
         existing.quantity += item.quantity;
-        return [existing, previous];
+        return [existing, previousIndex];
     }
 
     /**
@@ -206,7 +235,7 @@ export class Character extends Entity{
      */
      addResource(resource){
         // Check if we already have it
-        let existing = this.getResource(resource.resourcetype.id, true);
+        let existing = this.getResource(resource.resourcetype.id);
         // Just add it if we don't have it
         if(!existing){
             this.resources[resource.resourcetype.id] = 0;
@@ -354,6 +383,7 @@ export class PlayerCharacter extends Character{
      * @param {Number} id - The enumerated id of this specific Entity
      * @param  {Symbol[]} roles - A list of roles to add to this Entity on creation.
      *                             Character is automatically added.
+     * @param {Game} game - The Game Object the Character belongs to
      * @param {Object} statistics - An object containing statistics.
      * @param {Number} statistics.hp - An integer representing the Character's max hp
      * @param {Number} statistics.currentHP - An integer representing the Character's current hp
@@ -365,8 +395,8 @@ export class PlayerCharacter extends Character{
      * @param {Item[]}   equipment.items - An Array of Item Objects owned by the character
      * @param {Resource[]}   equipment.resources - An Array of Resource Objects owned by the character
      */
-    constructor(id, roles, statistics, equipment){
-        super(id, roles);
+    constructor(id, roles, game, statistics, equipment){
+        super(id, roles, game);
 
         // It's arguably more future-proof not to individually pull out statistics
         // and just to copy whole the object over

@@ -196,6 +196,7 @@ export class Game extends UTILS.EventListener{
     setupGameplayUI(){
         this.COLONY.setupUI();
         this.MESSAGELOG.setupUI();
+        this.MAP.setupUI();
     }
 
     /**
@@ -209,7 +210,7 @@ export class Game extends UTILS.EventListener{
         // out with 3 batteries and 10 scrap
         this.COLONY.addResource(1,3);
         this.COLONY.addResource(2,10);
-        this.MAP = this.newMap(this.random(), true);
+        this.MAP = this.newMap(this, this.random(), true);
         this.MESSAGELOG = new MessageLog(this);
         this.GAMEPLAYSEQUENCE = new this._gameplayclass(this);
         this.setupGameplayUI();
@@ -231,6 +232,8 @@ export class Game extends UTILS.EventListener{
         }
         // Remove Player Listeners
         this.PLAYER.removeAllListeners();
+        // Stop the Map Loop
+        this.MAP.clearLoop();
         // Remove Map listners
         this.MAP.removeAllListeners();
         // Stop the colony loop
@@ -255,7 +258,7 @@ export class Game extends UTILS.EventListener{
      * Returns a starting player character
      */
      startingCharacter(){
-        let player = new PlayerCharacter(0, [roles.CHARACTER, roles.PLAYER],
+        let player = new PlayerCharacter(0, [roles.CHARACTER, roles.PLAYER], this,
             {hp:5, currentHP: 5},
             {
                 weapons: null,

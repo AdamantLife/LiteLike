@@ -4,6 +4,7 @@ import { sectors} from "./colony.js";
 import * as COLONY from "./colony.js";
 import * as UTILS from "./utils.js";
 import * as IO from "./io.js";
+import * as ENCOUNTERS from "./encounters.js";
 
 
 /**

@@ -211,12 +211,23 @@ export function saveFile(game){
         transport: game.PLAYER.transport !== null ? game.PLAYER.transport.id : game.PLAYER.transport
     }
 
-    // For weapons, we're just saving the weapontype id
-    for(let weapon of game.PLAYER.weapons) output.player.equipment.weapons.push(weapon.type.id);
+    // For weapons, we're saving the weapontype id and index
+    for(let i = 0; i< game.PLAYER.weapons.length; i++){
+        // Get the weapon at the given index
+        let weapon = game.PLAYER.weapons[i];
+        // skip if no weapon
+        if(!weapon || typeof weapon == "undefined") continue;
+        // Save index and weapon to output
+        output.player.equipment.weapons.push([i,id]);
+    }
 
-    // Convert Item Array to just id, qty arrays
-    for(let obj of game.PLAYER.items){
-        output.player.equipment.items.push([obj.type.id, obj.quantity]);
+    // Convert Item Array to index, id, qty arrays
+    for(let i = 0; i < game.PLAYER.items.length; i++){
+        // Get the item at the given index
+        let item = game.PLAYER.items[i];
+        // Skip if no item
+        if(!item || typeof item == "undefined") continue;
+        output.player.equipment.items.push([i, item.type.id, item.quantity]);
     }
 
     // Convert Resource Object to id, qty array
@@ -274,23 +285,27 @@ export function loadSave(file, gameplaysequence){
 
                 // Armor and transport are singletons and therefore are just lookedup
                 if(savedata.player.equipment.armor !== null) equipment.armor = game.ITEMS.armor[savedata.player.equipment.armor];
-                if(savedata.player.equipment.transport !== null) equipment.transport = game.ITEMS.transports[savedata.player.equipment.transport];
+                if(savedata.player.equipment.transport !== null){
+                    equipment.transport = game.ITEMS.transports[savedata.player.equipment.transport];
+                    // Make sure Transport is topped off
+                    equipment.transport.topOff();
+                }
 
                 // Resources, Items, and Weapons need instances generated
                 for(let [id, qty] of savedata.player.equipment.resources){
                     let resource = new ITEMS.Resource(game.ITEMS.resources[id], qty);
                     resources[id] = resource;
                 }
-                for(let [id, qty] of savedata.player.equipment.items){
+                for(let [index,id, qty] of savedata.player.equipment.items){
                     let item = new ITEMS.Item(game.ITEMS.items[id], qty);
-                    items.push(item);
+                    items[index] = item;
                 }
-                for(let id of savedata.player.equipment.weapons){
+                for(let [index, id] of savedata.player.equipment.weapons){
                     let weapon = new ITEMS.Weapon(game.ITEMS.weapons[id]);
-                    weapons.push(weapon);
+                    weapons[index] = weapon;
                 }
 
-                player = new CHARACTER.PlayerCharacter(0, [CHARACTER.roles.CHARACTER, CHARACTER.roles.PLAYER],
+                player = new CHARACTER.PlayerCharacter(0, [CHARACTER.roles.CHARACTER, CHARACTER.roles.PLAYER], game,
                     savedata.player.statistics,
                     equipment
                     );
@@ -325,7 +340,7 @@ export function loadSave(file, gameplaysequence){
                 );
 
                 
-                map = new MAP.Map(savedata.map.seed, savedata.map.mask);
+                map = new MAP.Map(game, savedata.map.seed, savedata.map.mask, player);
 
                 game.PLAYER = player;
                 game.COLONY = colony;

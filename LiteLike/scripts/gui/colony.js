@@ -4,6 +4,7 @@ import { getStrings, makeTranslationLookup } from "../io.js";
 import { MAXPOWER, sectors, TheColony } from "../colony.js";
 import { enumerate, invertCost, generateElementPath} from "../utils.js";
 import * as CHARACTER from "../character.js";
+import { buildMessageSequence } from "../encounters.js";
 
 /** DEVNOTE- this list needs to be maintained alongside the LANGUAGE jsons */
 const STRINGS = enumerate(
@@ -11,7 +12,7 @@ const STRINGS = enumerate(
     "COST",
     // Home Pages
     // Starts on SECTORS because the first tab's name is dynamically generated
-    "SECTORPAGE", "MEEPLEPAGE", "MAPPAGE",
+    "SECTORPAGE", "MEEPLEPAGE", "TRAVELPAGE",
     // Home Admin Page, top line
     "ADDBATTERIES","RESIDENTS",
     // Home Admin Page, fieldset legends
@@ -35,7 +36,7 @@ const STRINGS = enumerate(
     // Fieldset legends
     "JOBS","INCOME",
 
-    // Map Page
+    // Travel Page
     // Travel Preparations
     // Transport Info
     "FUEL", "CAPACITY",
@@ -45,7 +46,10 @@ const STRINGS = enumerate(
     "MECH",
 
     // Loadouts
-    "WEAPONLOADOUT", "ITEMLOADOUT"
+    "WEAPONLOADOUT", "ITEMLOADOUT",
+
+    // Travel Requirements
+    "TRAVELREPAIR"
 )
 
 export class TheColonyGUI{
@@ -94,9 +98,9 @@ export class TheColonyGUI{
         //this.game.PLAYER.addEventListener("equipmentchange", this.updateArmorTransport.bind(this));
 
         // This is bound in setupTravelPrep, but noted here for reference
-        // mapPage.addEventListener("dragstart", this.dragInventory.bind(this));
-        // mapPage.addEventListener("dragover", this.dragInventoryOver.bind(this));
-        // mapPage.addEventListener("drop", this.dropInventory.bind(this));
+        // travelPage.addEventListener("dragstart", this.dragInventory.bind(this));
+        // travelPage.addEventListener("dragover", this.dragInventoryOver.bind(this));
+        // travelPage.addEventListener("drop", this.dropInventory.bind(this));
         // this.game.PLAYER.addEventListener("equipmentchange", this.updateMapTransport.bind(this));
         // this.game.PLAYER.addEventListener("inventorychange", this.updateMapWeight.bind(this));
         // this.game.PLAYER.addEventListener("weaponadded", this.updatePlayerInventory.bind(this));
@@ -104,8 +108,8 @@ export class TheColonyGUI{
         // this.game.PLAYER.addEventListener("itemadded", this.updatePlayerInventory.bind(this));
         // this.game.PLAYER.addEventListener("itemremoved", this.updatePlayerInventory.bind(this));
         // this.game.PLAYER.addEventListener("resourceschange", this.updatePlayerInventory.bind(this));
-        // mapPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
-        // mapPage.querySelector("fieldset[data-cargo]").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        // travelPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        // travelPage.querySelector("fieldset[data-cargo]").addEventListener("click", this.togglePlayerQuantity.bind(this));
         // this.colony.addEventListener("itemsmodified", this.updateMechAvailability.bind(this));
         // this.colony.addEventListener("resourcesmodified", this.updateMechAvailability.bind(this));
     }
@@ -157,25 +161,27 @@ export class TheColonyGUI{
      */
     setupUI(){
         this.game.UI.gamewindow.insertAdjacentHTML("beforeend", `
-<div id="statuspanel"></div>
-<div id="home" style="width:100%;height:75vh;"><div id="homenavbar"></div><hr /><div id="homecontent"></div></div>
-<div id="gamemenu">
-    <svg viewBox="0 0 20 15" preserveAspectRatio="none">
-        <defs>
-            <linearGradient id="grip" gradientTransform="rotate(90 0.5 0.5)" gradientUnits="objectBoundingBox">
-                <stop offset="0" stop-color="rgb(0, 10, 50)" />
-                <stop offset="0.5" stop-color="rgb(0, 40, 125)" />
-                <stop offset="1" stop-color="rgb(0, 75, 255)" />
-            </linearGradient>
-        </defs>
+<div id="colony">
+    <div id="statuspanel"></div>
+    <div id="home" style="width:100%;height:75vh;"><div id="homenavbar"></div><hr /><div id="homecontent"></div></div>
+    <div id="gamemenu">
+        <svg viewBox="0 0 20 15" preserveAspectRatio="none">
+            <defs>
+                <linearGradient id="grip" gradientTransform="rotate(90 0.5 0.5)" gradientUnits="objectBoundingBox">
+                    <stop offset="0" stop-color="rgb(0, 10, 50)" />
+                    <stop offset="0.5" stop-color="rgb(0, 40, 125)" />
+                    <stop offset="1" stop-color="rgb(0, 75, 255)" />
+                </linearGradient>
+            </defs>
 
-        <rect y="0" width="20" height="5" fill="url('#grip')"/>
-        <rect y="5" width="20" height="5" fill="url('#grip')"/>
-        <rect y="10" width="20" height="5" fill="url('#grip')"/>
-    </svg>
-    <div>
-        <button id="savegame">${this.game.UI.translate(this.game.UI.STRINGS.SAVE)}</button>
-        <button id="quitgame">${this.game.UI.translate(this.game.UI.STRINGS.QUIT)}</button>
+            <rect y="0" width="20" height="5" fill="url('#grip')"/>
+            <rect y="5" width="20" height="5" fill="url('#grip')"/>
+            <rect y="10" width="20" height="5" fill="url('#grip')"/>
+        </svg>
+        <div>
+            <button id="savegame">${this.game.UI.translate(this.game.UI.STRINGS.SAVE)}</button>
+            <button id="quitgame">${this.game.UI.translate(this.game.UI.STRINGS.QUIT)}</button>
+        </div>
     </div>
 </div>`);
 
@@ -405,8 +411,8 @@ export class TheColonyGUI{
     }
 
     /**
-     * Sets up the Travel Preparation (Map) Tab
-     * DEVNOTE- The map itself is a popup which is created by interacting with the
+     * Sets up the Travel Preparation Tab
+     * DEVNOTE- The map is a popup which is created by interacting with the
      *      Travel Prep Tab, so the Travel Prep Tab will always be in the background
      *      while traveling the Overworld
      */
@@ -416,7 +422,8 @@ export class TheColonyGUI{
         let home = this.homecontent;
         let transport = this.game.PLAYER.transport;
         let transportstrings = getStrings(this.game.STRINGS, transport);
-        home.insertAdjacentHTML('beforeend', `<div id="mapPage">
+        home.insertAdjacentHTML('beforeend', `<div id="travelPage">
+        <button id="depart">Depart</button>
 <fieldset id="transport"><legend title="${transportstrings.flavor}">${transportstrings.name}</legend>
 <div><b>${this.translate(STRINGS.FUEL)}</b>:&nbsp;<span data-fuel>${transport.maxReactorPower}</span></div>
 <div><b>${this.translate(STRINGS.CAPACITY)}</b>:&nbsp;<span data-carry>${this.game.PLAYER.weight}</span>/<span data-capacity>${transport.capacity}</span></div>
@@ -440,14 +447,17 @@ export class TheColonyGUI{
     </tbody></table>
 </fieldset>
 </div>`);
-        this.registerPage("map", this.translate(STRINGS.MAPPAGE));
+        this.registerPage("travel", this.translate(STRINGS.TRAVELPAGE));
+
+        // Checks that the player has Repairbots and then shows the Map
+        document.getElementById("depart").onclick = this.checkShowMap.bind(this);
 
         // The Travel Preparations section is populated by a combination of drag-and-drop and arrows
-        // Since the drag and drop functionality can be used in multiple places, mapPage is bound in general
-        let mapPage = document.getElementById("mapPage");
-        mapPage.addEventListener("dragstart", this.dragInventory.bind(this));
-        mapPage.addEventListener("dragover", this.dragInventoryOver.bind(this));
-        mapPage.addEventListener("drop", this.dropInventory.bind(this));
+        // Since the drag and drop functionality can be used in multiple places, travelPage is bound in general
+        let travelPage = document.getElementById("travelPage");
+        travelPage.addEventListener("dragstart", this.dragInventory.bind(this));
+        travelPage.addEventListener("dragover", this.dragInventoryOver.bind(this));
+        travelPage.addEventListener("drop", this.dropInventory.bind(this));
         
         // Make sure to update transport title when the Player's transport changes 
         this.game.PLAYER.addEventListener("equipmentchange", this.updateMapTransport.bind(this));
@@ -458,11 +468,11 @@ export class TheColonyGUI{
         this.game.PLAYER.addEventListener("weaponremoved", this.updatePlayerInventory.bind(this));
         this.game.PLAYER.addEventListener("itemadded", this.updatePlayerInventory.bind(this));
         this.game.PLAYER.addEventListener("itemremoved", this.updatePlayerInventory.bind(this));
-        this.game.PLAYER.addEventListener("resourceschange", this.updatePlayerInventory.bind(this));
+        this.game.PLAYER.addEventListener("resourceschange", this.updateMechResources.bind(this));
 
         // Toggles for manipulating inventory quantities
-        mapPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
-        mapPage.querySelector("fieldset[data-cargo]").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        travelPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
+        travelPage.querySelector("fieldset[data-cargo]").addEventListener("click", this.togglePlayerQuantity.bind(this));
 
         // Update toggle arrows when colony inventory changes
         this.colony.addEventListener("itemsmodified", this.updateMechAvailability.bind(this));
@@ -1255,7 +1265,7 @@ export class TheColonyGUI{
             case statusweapons:
                 id= parseInt(event.target.dataset.id);
                 type="weapon";
-                qty = 1
+                qty = Math.min(this.colony.getWeapon(id), 1)
                 break;
             case statusitems:
                 id = parseInt(event.target.dataset.id);
@@ -1292,7 +1302,7 @@ export class TheColonyGUI{
          *  DEVNOTE- The Dragover Callback wants to know the type, but cannot see values associated to types
          *      therefore we are saving the type as part of the dataType (available to Dragover via dataTransfer.types)
          */
-        event.dataTransfer.setData(`text/${type}`, `${id}/${index}/${qty}`);
+        event.dataTransfer.setData(`text/obj`, `${type}/${id}/${index}/${qty}`);
     }
 
     /**
@@ -1321,20 +1331,8 @@ export class TheColonyGUI{
 
         let src = event.dataTransfer.getData("text/node");
 
-        let type;
-        for(let itype of ["weapon", "item", "resource"]){
-            for(let ptype of event.dataTransfer.types){
-                if(ptype.endsWith(itype)){
-                    type = itype;
-                    break;
-                }
-            }
-            if(type) break;
-        }
-        if(!type) return;
-
-        let idindexqty = event.dataTransfer.getData(`text/${type}`);
-        let [id,index,qty] = idindexqty.split("/");
+        let idindexqty = event.dataTransfer.getData(`text/obj`);
+        let [type, id,index,qty] = idindexqty.split("/");
         id = parseInt(id), index = parseInt(index), qty = parseInt(qty);
 
         let player = this.game.PLAYER
@@ -1384,7 +1382,7 @@ export class TheColonyGUI{
         }
         // Resource
         else{
-            qty = player.getResource(id);
+            qty = player.getResource(id, true).quantity;
             player.resources[id] = null;
             // player.resources is a {id: qty} mapping, so convert what we have to a Resource Instance
             item = this.game.createEquipmentInstance("Resource", id, qty);
@@ -1464,8 +1462,13 @@ export class TheColonyGUI{
             // for each different one (at most only one item will be pushed into index > items.loadout)
             for(let index = 0; index < player.items.loadout+1; index++){
                 let item = player.items[index];
+                // An item or different item was added to this slot
                 if(item && typeof item !== "undefined" && initial[index]!=item){
                     player.triggerEvent("itemadded", {item, index});
+                // An item was removed from this slot
+                }else if((!item || typeof item == "undefined") && initial[index] && typeof initial[index] !== "undefined"){
+                    // Provide the removed item as the item
+                    player.triggerEvent("itemremoved", {item:initial[index], index});
                 }
             }
             
@@ -1501,7 +1504,7 @@ export class TheColonyGUI{
                     player.triggerEvent("itemremoved", {item, index:previousIndex});
                 }
                 // Update index to match the current position of the Item
-                index = player.getItem(item);
+                index = player.getItemIndex(item.type.id);
                 player.triggerEvent("itemadded", {item, index});
 
                 dropped = true;
@@ -1535,7 +1538,7 @@ export class TheColonyGUI{
     }
 
     /**
-     * Update the Travel Preparations (Map Tab) Transport fieldset
+     * Update the Travel Preparations Transport fieldset
      * @param {CharacterEvent} event - The Character.equipmentchange event
      */
     updateMapTransport(event){
@@ -1563,28 +1566,22 @@ export class TheColonyGUI{
      */
     updatePlayerInventory(event){
         let player = this.game.PLAYER;
+        let type, loadout;
         // Delegate as necessary
-        if(event.eventtype.description == "weaponadded" || event.eventtype.description == "weaponremoved"){
-            // If it's part of the loadout, update loadout
-            if(event.index < player.weapons.loadout) this.updateLoadout("weapon", event.index);
-            // Otherwise, update transport
-            else this.reloadTransportType("weapon");
-            // If the weapon has ammo, make sure the ammo is available in the Transport Resources
-            if(event.item.type.ammunition){
-                // We'll spoof an event to call the update function
-                // NOTE- We need to include a change amount, since updateMechResources skips the resource
-                // if the change is 0: uMR ignores our fake change amount and reference the Player
-                // instead to find the quantity to display
-                this.updateMechResources({resources:{[event.item.type.ammunition]: 1}});
-            }
-
-        // See above notes
-        }else if(event.eventtype.description == "itemadded"|| event.eventtype.description == "itemremoved"){
-            if(event.index < player.items.loadout) this.updateLoadout("item", event.index);
-            else this.reloadTransportType("item");
+        if(event.eventtype.description == "weaponadded" || event.eventtype.description == "weaponremoved") type = "weapon", loadout = player.weapons.loadout;
+        if(event.eventtype.description == "itemadded" || event.eventtype.description == "itemremoved") type = "item", loadout = player.items.loadout;
+        // If it's part of the loadout, update loadout
+        if(event.index < loadout) this.updateLoadout(type, event.index);
+        // Otherwise, update transport
+        else this.reloadTransportType(type);
+        // If the weapon has ammo, make sure the ammo is available in the Transport Resources
+        if(type == "weapon" && event.item.type.ammunition){
+            // We'll spoof an event to call the update function
+            // NOTE- We need to include a change amount, since updateMechResources skips the resource
+            // if the change is 0: uMR ignores our fake change amount and reference the Player
+            // instead to find the quantity to display
+            this.updateMechResources({resources:{[event.item.type.ammunition]: 1}});
         }
-        // resourcechange
-        else this.updateMechResources(event);
     }
 
     /**
@@ -1593,8 +1590,9 @@ export class TheColonyGUI{
      * @param {HTMLElement} element - A DOM Element to add the quantity elements to
      * @param {Object} item - An Object (Item or Resource) to get the quantity from
      * @param {Number} item.quantity - The Object should have a numeric quantity to display
+     * @param {Boolean} availability - Whether or not to enable the Plus arrow
      */
-    addQuantity(element, item){
+    addQuantity(element, item, availability){
         element.insertAdjacentHTML('beforeend',`: <span data-qty>${item.quantity}</span><table class="incrementer inline"><tbody>
             <tr><td class="plus"></td>
             <td class="minus"></td></tr>
@@ -1604,6 +1602,7 @@ export class TheColonyGUI{
         if(!item.quantity){
             element.lastElementChild.querySelector("td.minus").classList.add("disabled");
         }
+        if(!availability) element.lastElementChild.querySelector("td.plus").classList.add("disabled");
     }
     
     /**
@@ -1613,6 +1612,7 @@ export class TheColonyGUI{
      */
     updateLoadout(type,index){
         let slot = document.querySelector(`#loadout tbody.loadout.${type}s td[data-slot="${index}"]`);
+        if(!slot) return;
         // We're overwriting the slot, so clear it out
         while(slot.lastElementChild) slot.lastElementChild.remove();
 
@@ -1624,7 +1624,9 @@ export class TheColonyGUI{
         let strings = getStrings(this.game.STRINGS, equipment);
         slot.insertAdjacentHTML('beforeend', `<span data-id="${equipment.type.id}" data-type="${type}" title="${strings.flavor}">${strings.name}</span>`);
         // If it's an item, add the quantity and toggle buttons to it
-        if(type == "item") this.addQuantity(slot.lastElementChild, equipment);
+        // The last arguement is availability and sets the plus arrow based on whether TheColony has any more qty
+        if(type == "item") this.addQuantity(slot.lastElementChild, equipment, Boolean(this.colony.getItem(equipment.type.id)));
+        this.updateMapWeight();
     }
 
     /**
@@ -1657,12 +1659,6 @@ export class TheColonyGUI{
             // so offset the count by 1 so when we increment we get the next index
             index = this.game.PLAYER.items.loadout -1;
         }
-        // Resources
-        else{
-            items = this.game.PLAYER.resources;
-            // resources start from 0, so we need to be at -1 before incrementing
-            index = 0;
-        }
 
         for(let item of items){
             index+=1
@@ -1672,8 +1668,10 @@ export class TheColonyGUI{
             let insertHTML = `<span class="cargo" data-type="${type}" data-id="${item.type.id}" data-index="${index}" title="${strings.flavor}" draggable="true">${strings.name}${typeof item.qty !== "undefined" ? `<span data-qty>${qty}</span>`: ``}</span>`;
             bucket.insertAdjacentHTML('beforeend', insertHTML);
             // If it's an item, add the quantity and toggle buttons to it
-            if(type == "item") this.addQuantity(bucket.lastElementChild, item);
+            // The last arguement is availability and sets the plus arrow based on whether TheColony has any more qty
+            if(type == "item") this.addQuantity(bucket.lastElementChild, item, Boolean(this.colony.getItem(item.type.id)));
         }
+        this.updateMapWeight();
     }
 
     /**
@@ -1687,7 +1685,7 @@ export class TheColonyGUI{
             // Resource didn't actually change (shouldn't actually happen)
             if(!qty) continue;
             // Like in other places, we'll reference The Player's current total instead
-            qty = player.getResource(resource);
+            qty = player.getResource(resource, true).quantity;
             if(!qty){
                 let isWeaponAmmo = false;
                 // Check if this resource is weapon ammo
@@ -1715,10 +1713,10 @@ export class TheColonyGUI{
             
             // Otherwise add resource if necessary and update qty
             // We only really need the qty span, so we'll fetch it specifically
-            let ele = cargo.querySelector(`span.cargo[data-type="resource"][data-id="${resource}"]>span[data-qty]`);
+            let parent = cargo.querySelector(`span.cargo[data-type="resource"][data-id="${resource}"]`)
 
             // No such span, so we (presumably) we need to add the full .cargo span
-            if(!ele || typeof ele == "undefined"){
+            if(!parent || typeof parent == "undefined"){
                 // The resource from resourcechange is ID only
                 // Need readable strings to display, which in turn requires an object to generate them
                 let obj = this.game.ITEMS.resources[resource];
@@ -1740,22 +1738,24 @@ export class TheColonyGUI{
                 else nextEle.insertAdjacentHTML('beforebegin', insertHTML);
 
                 // Our inserted ele
-                ele = cargo.querySelector(`span.cargo[data-id="${resource}"]`)
+                let ele = cargo.querySelector(`span.cargo[data-id="${resource}"]`)
 
                 // Add Quantity and Toggle arrows to it
-                this.addQuantity(ele, {quantity: qty});
-
-                // addQuantity only updates the minus arrow, so we need to update the plus arrow ourself
-                let colonyqty = this.colony.getResource(resource)
-                // colony.getResource returns undefined if the resource was never registered
-                if(typeof colonyqty == "undefined" || colonyqty <= 0) ele.querySelector("table.incrementer td.plus").classList.add("disabled");
+                let colonyqty = this.colony.getResource(resource);
+                this.addQuantity(ele, {quantity: qty}, Boolean(colonyqty));
 
                 // Newly created ele is up to date, so move on to next resource
                 continue;
             }
 
             // Otherwise, we can update the qty
-            ele.innerText = qty;
+            parent.querySelector(`span[data-qty]`).innerText = qty;
+            // Update minus Arrow
+            if(!qty){
+                parent.querySelector("td.minus").classList.add("disabled");
+            }else{
+                parent.querySelector("td.minus").classList.remove("disabled");
+            }
         }
 
         // Finally,  update weight (Spoofing an event)
@@ -1781,7 +1781,7 @@ export class TheColonyGUI{
         // we should really raise an Error instead
         if(typeof type == "undefined") return;
 
-        let mapPage = document.getElementById("mapPage");
+        let travelPage = document.getElementById("travelPage");
 
         for(let [id, _] of event[`${type}change`]){
             // Get the actual quantity on TheColony
@@ -1789,16 +1789,16 @@ export class TheColonyGUI{
 
             if(qty<=0){
                 // If TheColony does not have any, disable PLus Arrows
-                mapPage.querySelectorAll(`[data-type=${type}][data-id="${id}"] table.incrementer .plus`).forEach(ele=>ele.classList.add("disabled"));
+                travelPage.querySelectorAll(`[data-type=${type}][data-id="${id}"] table.incrementer .plus`).forEach(ele=>ele.classList.add("disabled"));
             }else{
                 // If TheColony does have the object, make sure all Plus Arrows are enabled
-                mapPage.querySelectorAll(`[data-type=${type}][data-id="${id}"] table.incrementer .plus`).forEach(ele=>ele.classList.remove("disabled"));
+                travelPage.querySelectorAll(`[data-type=${type}][data-id="${id}"] table.incrementer .plus`).forEach(ele=>ele.classList.remove("disabled"));
             }
         }
     }
 
     /**
-     * If an arrow is clicked on mapPage, toggles that resource +-
+     * If an arrow is clicked on travelPage, toggles that resource +-
      * @param {Event} event - The onclick event
      */
     togglePlayerQuantity(event){
@@ -1880,5 +1880,36 @@ export class TheColonyGUI{
         }
     }
     
+    /**
+     * Checks that the Player has Repairbots (so that it can actually travel the map)
+     * and then displays the Map
+     */
+    checkShowMap(){
+        // Repair Bots are ID 0
+        let repairbots = this.game.PLAYER.getItem(0, true);
+
+        // Require the Player to have Repair Bots in order to Travel
+        if(!repairbots.quantity){
+            // Get localized Repair Bot and Transport Names
+            let repairbotstring = getStrings(this.game.STRINGS, repairbots);
+            let transportstrings = getStrings(this.game.STRINGS, this.game.PLAYER.transport);
+            // Display a Message Sequence (only 1 Message encounter in sequence) telling the
+            // Player that they require Repair Bots to travel; using an Encounter as it's
+            // more obvious than the MessageBox
+            let sequence = buildMessageSequence(this.game, [
+                // Get localized string fro Travelrepair, and use localized name for repairbot
+                // DEVNOTE - While we're probably not going to change the name of Repair Bots,
+                //      it's still safer to substitute it in instead of hardcoding it in TRAVELREPAIR
+                this.translate(STRINGS.TRAVELREPAIR, {repairbot: repairbotstring.name, transport: transportstrings.name})
+            ]);
+
+            // Add Encounter Sequence (in case we happened to hit the travel button at the same
+            // time that a Random Encounter occurred) and return since we're not showing map
+            return this.game.getOrAddEncounter(sequence);
+        }
+
+        // Otherwise, we can show map so the player can travel
+        this.game.MAP.ui.showMap()
+    }
 }
 

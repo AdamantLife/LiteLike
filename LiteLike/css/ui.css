@@ -3,12 +3,16 @@ CSS for specific UI Elements
 */
 
 #gamewindow{
-    display: inline-flex;
     width:100%;
     height:100%;
 }
 
-#gamewindow>*{
+#colony{
+    display: inline-flex;
+    width: 100%;
+    height:100%;
+}
+#colony>*{
     padding:10px;
 }
 
@@ -413,6 +417,48 @@ span.cargo{
         background: #ff7f504d;
     }
 
+/**         MAP            */
+#mapBox{
+    
+    /* Left set so System Log can still show
+
+        Width of Statusboxes = 25vw
+
+        // We're taking both left and right padding because
+        // the right-side padding is greater than the Statusbox's
+        // border (which we would otherwise need to compensate for)
+        // and adds an automatic padding between the Map and Statusboxes
+        Colony Div Padding, left and right = 10px x 2
+
+        Body Margin = 8px
+    */
+    left:calc(25vw + 28px);
+    top: 50%;
+    z-index: 1;
+    background-color: white;
+    border: groove 5px;
+    font-size:  larger;
+    transform: translate(0, -50%);
+    padding:5px;
+}
+
+#foodRepairBox{
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#foodRepairBox span:first-of-type{
+    font-weight: bold;
+}
+
+#map{
+    font-family:monospace;
+    display:inline;
+    letter-spacing:1em;
+    font-size: large;
+}
+
+
+
 /**        EVENTS          */
 #events{
     left: 25vw;
@@ -420,10 +466,10 @@ span.cargo{
     top: 25vh;
     height: 50vh;
     margin: auto;
-    z-index: 2;
+    z-index: 3;
     background-color: white;
     border-style: double;
-
+    font-size: large;
 }
 
 #events.shown{
@@ -474,6 +520,20 @@ span.cargo{
 
 #events .eventmain{
     overflow-y: scroll;
+}
+
+#events>p:has(span.gameover){
+    height: 100%;
+    height:-webkit-fill-available;
+    width:100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 0px;
+}
+#events .gameover{
+    font-weight: bold;
+    font-size: xx-large;
 }
 
 #eventexit{
