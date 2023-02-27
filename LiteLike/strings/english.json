@@ -154,8 +154,9 @@
             "Quit",
             "<span class='gameover'>GAME OVER</span>",
             "Your transport's reactor dies, and with it any hope of getting home.\n\nYou slowly drift through space, and the coldness of space slowly drift into you.\n\nAs your body freezes you become unable to look at anything but the darkness of space ahead of you.\n\n&nbsp;&nbsp;&nbsp;&nbsp;And in the end, you become the darkness yourself.",
-            "Blood and atmosphere leaks through the holes in your spacesuit. You watch helplessly as it streams through breaches in the cabin that you can no longer repair.\n\nYour vision becomes blurry. You slowly lose your grip on the flight stick as your hands go numb. The ship's sirens which were piercing your ears have become a distant clamor.\n\nYou're not sure if it's the radiation leaking through,\n&nbsp;&nbsp;&nbsp;&nbsp;or the blood in your eyes,\n\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;but the only remaining sensation\n\n\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is red.",
-            "You are unbalanced. You are unfocused. You are confused.\n\nYou can't remember what happened.\n&nbsp;&nbsp;Was it an enemy?\n&nbsp;&nbsp;Was it radiation?\n&nbsp;&nbsp;Was it an accident?\n\nYou collapse to the floor... and will never know the reason why."
+            "Blood and atmosphere leaks through the holes in your spacesuit. You watch helplessly as it streams through breaches in the cabin that you can no longer repair.\n\nYour vision becomes blurry. You slowly lose your grip on the flight stick as your hands go numb. The ship's sirens which were piercing your ears have become a distant clamor.\n\nYou're not sure if it's the radiation leaking through,\n&nbsp;&nbsp;&nbsp;&nbsp;or the blood in your eyes,\n\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;but the only remaining sensation\n\n\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is <span style='color:red;font-weight:bold;'>red</span>.",
+            "You are unbalanced. You are unfocused. You are confused.\n\nYou can't remember what happened.\n&nbsp;&nbsp;Was it an enemy?\n&nbsp;&nbsp;Was it radiation?\n&nbsp;&nbsp;Was it an accident?\n\nYou collapse to the floor... and will never know the reason why.",
+            "You were a survivor.\nYou were a veteran of countless battles.\n\nYou were an explorer.\nYou were constantly risking your life for the sake of humanity.\n\nYou were the one who revived a dead colony.\nYou were the one who defended it from its enemies.\n\n\n\n<span style='text-align:center;'>You Were.</span>"
         ],
         "colony":[
             "Requires",
@@ -219,7 +220,9 @@
 
         "map":[
             "Upon return to the ${power} ${population}, the dockworkers unload the resources you've gathered.",
-            "Returning to the ${power} ${population}, you unload your spoils by yourself."
+            "Returning to the ${power} ${population}, you unload your spoils by yourself.",
+            "While exploring a derelict port you are ambushed by a ${opponent}!",
+            "You arrive at port and retrieve a cache of supplies your allies had left for you."
         ]
     }
 }

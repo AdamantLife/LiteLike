@@ -23,7 +23,7 @@ export function enumerate(){
  * provided to use; otherwise, Math.random can be used.
  * 
  * @param {Array} array - The array to choose an element from
- * @param {*} random - A random number generator to use
+ * @param {*} [random] - A random number generator to use
  * @returns {* | null} - A random element from the array, or null if the array is empty
  */
 export function randomChoice(array, random){
@@ -55,7 +55,24 @@ export function randomChoice(array, random){
      */
 }
 
+/**
+ * Returns an Integer between min (inclusive) and max (inclusive)
+ * 
+ * Taken from: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+ * 
+ * @param {Number} min - The bottom bounds (inclusive)
+ * @param {Number} max - The upper bounds (inclusive)
+ * @param {*} [random] - The random generator to use
+ * @returns 
+ */
+export function randomInt(min, max, random){
+    // If a random number generator is not provided, use Math.random
+    if(typeof random == "undefined") random = Math.random;
 
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min+1) + min);
+}
 
 
 /**

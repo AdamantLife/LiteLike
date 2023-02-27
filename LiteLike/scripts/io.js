@@ -133,8 +133,12 @@ export function loadEncounters(){
 
         // We do not parse Combatants as they are not singletons
         combatants = data.combatants;
+
+        let tiers = [];
+        // We also do not parse tiers, as they are only ID's
+        tiers = data.tiers;
         
-        return {combatants};
+        return {combatants, tiers};
     }
     
     return fetch("./entities/encounters.json")  // Fetch encounters.json from the server
@@ -218,7 +222,7 @@ export function saveFile(game){
         // skip if no weapon
         if(!weapon || typeof weapon == "undefined") continue;
         // Save index and weapon to output
-        output.player.equipment.weapons.push([i,id]);
+        output.player.equipment.weapons.push([i,weapon.type.id]);
     }
 
     // Convert Item Array to index, id, qty arrays
@@ -285,6 +289,8 @@ export function loadSave(file, gameplaysequence){
 
                 // Armor and transport are singletons and therefore are just lookedup
                 if(savedata.player.equipment.armor !== null) equipment.armor = game.ITEMS.armor[savedata.player.equipment.armor];
+                // Otherwise, give him Basic Armor
+                else{ equipment.armor = game.ITEMS.armor[0]; }
                 if(savedata.player.equipment.transport !== null){
                     equipment.transport = game.ITEMS.transports[savedata.player.equipment.transport];
                     // Make sure Transport is topped off
@@ -340,7 +346,7 @@ export function loadSave(file, gameplaysequence){
                 );
 
                 
-                map = new MAP.Map(game, savedata.map.seed, savedata.map.mask, player);
+                map = new MAP.Map(game, savedata.map.seed, savedata.map.mask, savedata.map.clearlist, player);
 
                 game.PLAYER = player;
                 game.COLONY = colony;

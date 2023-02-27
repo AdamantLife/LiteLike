@@ -436,17 +436,37 @@ export function buildMessageSequence(game, messages){
     return sequence;
 }
 
+/** 
+ * Additional options for buildCombatEncounter
+ * @typedef {object} CombatEncounterBuilderOptions
+ * @property {String | CombatEncounterBuilderMessageCallback} options.message - Creates a MessageEvent prior to the CombatEvent. Based on
+ *      either the string provided, or the return from the CombatEncounterBuilderMessageCallback.
+ * @property {Function} options.combatexit - Overrides the onexit for the generated CombatEncounter
+ * @property {Function} options.rewardexit - Overrides the onexit for the generated RewardEncounter
+ * @property {Function} options.messageexit - Overrides the onexit for the generated MessageEncounter (if that encounter is created)
+ * @property {Number} [options.tier=1] - If this is a random encounter and/or has random rewards, this will override the default tier
+ */
+
+/**
+ * Contains info relevant to the CombatEncounter being built
+ * @typedef {Object} CombatEncounterBuilderInfo
+ * @property {combatCharacter} enemy - The CombatCharacter the Player is fighting
+ * @property {Reward[]} rewards - The rewards the Player will receive if he wins
+ */
+
+/**
+ * 
+ * @callback CombatEncounterBuilderMessageCallback
+ * @param {CombatEncounterBuilderInfo}- Info relevant to the CombatEncounter being built
+ * @returns {String} - The message to display
+ */
+
 /**
  * Creates a new Combat Encounter Sequence which is a CombatEncounter followed by a RewardEncounter. Unspecified values are randomized.
  * @param {Game} game - The game object to get statistics from
- * @param {Character | null} enemy - Enemy ID to fight. Null will produce a random tier 1 encounter
- * @param {ItemDescription[] | null} rewards - A list of rewards. Null will produce random tier 1 rewards
- * @param {Object} options - Additional options
- * @param {String} options.message - Creates a MessageEvent prior to the CombatEvent
- * @param {Function} options.combatexit - Overrides the onexit for the generated CombatEncounter
- * @param {Function} options.rewardexit - Overrides the onexit for the generated RewardEncounter
- * @param {Function} options.messageexit - Overrides the onexit for the generated MessageEncounter (if that encounter is created)
- * @param {Number} [options.tier=1] - If this is a random encounter and/or has random rewards, this will override the tier
+ * @param {Character | null} enemy - Enemy ID to fight. Null will produce a random tier 1 encounter unless overridden in options
+ * @param {ItemDescription[] | null} rewards - A list of rewards. Null will produce random tier 1 rewards unless overridden in options
+ * @param {CombatEncounterBuilderOptions} options - Additional options
  * @returns {EncounterSequence} - Returns the full combat sequence
  */
 export function buildCombatEncounter(game, enemy, rewards, options){
@@ -455,17 +475,42 @@ export function buildCombatEncounter(game, enemy, rewards, options){
     // If tier is in options, then use it, otherwise default to 1
     let tier = options.tier && options.tier !== "undefined" ? options.tier : 1;
 
-    // TODO: Random Encounter
+    // If no enemy, get a random one of the appropriate tier
+    if(!enemy || typeof enemy == "undefined"){
+        // Pull a random oppenent for the appropriate tier
+        // NOTE- the tiers are stored 0-indexed, but we are accessing them
+        //          as 1-indexed for readability, so we need to subtract 1
+        enemy = UTILS.randomChoice(game.ENCOUNTERS.tiers.combatants[tier-1], game.random);
+    }
+
+    // Create enemy based on id
     enemy =createCombatant(enemy, game.ENCOUNTERS.combatants, game.ITEMS);
+
     // Invalid Enemy ID
     if(!enemy || typeof enemy == "undefined") return;
     
     // TODO: Random Rewards
-    if(!rewards) return;
+    if(!rewards || typeof rewards == "undefined"){
+        // setup a new reward array
+        rewards = [];
+
+        // Randomly determine number of rewards between 1 and 3
+        let numrewards = Math.floor(game.random()*3) + 1;
+
+        // TODO: Add Reward Weights
+        // Generate the rewards
+        for(let i = 0; i < numrewards; i++){
+            // NOTE-Remember that tiers are 1-indexed, so need to subtract 1
+            rewards.push(UTILS.randomChoice(game.ENCOUNTERS.tiers.rewards[tier-1], game.random));
+        }
+    };
+
 
     let rewardobjs = []
+    // Convert each reward into an actual Instance (e.g.- Resource, Item, etc)
     for(let reward of rewards){
         let result = parseReward(game, reward);
+        // Might not have been able to parse the reward, so check before adding it
         if(result) rewardobjs.push(result);
     }
 
@@ -488,7 +533,15 @@ export function buildCombatEncounter(game, enemy, rewards, options){
         let messageexit = onexit;
         if(options.messageexit && typeof options.messageexit !== "undefined") messageexit = options.messageexit;
 
-        let message = new MessageEncounter({game, message: options.message, onexit: messageexit});
+        let messagestring = options.message;
+        // Check if messagestring is a function
+        if(typeof messagestring == "function"){
+            // If it is, provide it the enemy and reward objects
+            // and use its return as our new messagestring
+            messagestring = messagestring({enemy, rewards: rewardobjs});
+        }
+
+        let message = new MessageEncounter({game, message: messagestring, onexit: messageexit});
         
         // Start with the message encounter
         sequence.addEncounter(message);
@@ -501,19 +554,52 @@ export function buildCombatEncounter(game, enemy, rewards, options){
 }
 
 /**
+ * Creates a Basic Encounter Sequence which is triggered whenever the Player
+ * enters an Unexplored Port
+ * @param {Game} game - The GAME object
+ * @param {String | CombatEncounterBuilderMessageCallback} banditMessage - The localized pre-combat message to display,
+ *      or a callback to generate one
+ */
+export function buildUnexploredPortSequence(game, banditMessage){
+    return buildCombatEncounter(game, 0, [{type: "Resource", id: 2, qty: 10}], {message: banditMessage});
+}
+
+/**
+ * Creates a Port Reward Sequence which tops-off the Players Transport and gives him a 5 Repair Bot Reward
+ * @param {Game} game - The GAME object
+ * @param {String } message - The Port Message to display before toping off the Player's Transport
+ */
+export function buildPortSequence(game, message){
+    // Create Callback Encounter which displays the given Port Message and tops off the Player's Transport
+    let callback = new CallbackEncounter({game, message, callback:game.PLAYER.transport.topOff});
+
+    // Create reward encounter with 5 Repair Bots
+    let reward = new RewardEncounter({game, rewards:[{type: "Item", id: 0, qty: 5}]});
+
+    return new EncounterSequence([callback, reward]);
+}
+
+/**
  * Converts a list of reward description Objects to actual rewards
  * @param {Game} game - The game to use to parse the rewards
  * @param {ItemDescription} reward - A list of rewards
  */
 export function parseReward(game, reward){
+    // If no reward, return (null)
+    if(!reward || typeof reward == "undefined") return;
+
     // We were passed a reward object, so return it
     if(reward.constructor.name == "Reward") return reward;
+
+
 
     let obj = null;
     // If qty is provided, use it (defaults to 1)
     let qty = reward.qty && reward.qty !== "undefined" ? reward.qty : 1;
-    let lookup;
+    // Check if qty is an Array, if it is we need to randomly determine an amount
+    if(qty.constructor.name == "Array"){ qty = UTILS.randomInt(...qty, game.random);}
 
+    let lookup;
     
     switch(reward.type){
         // Singletons

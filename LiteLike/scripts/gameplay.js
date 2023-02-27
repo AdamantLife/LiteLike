@@ -59,7 +59,7 @@ export class GameplaySequence{
                     sectors:[sectors.SCRAP]
                 }
             },
-            "resource":{
+            "cresource":{
                 "1":{
                     callbacks: [
                         this.firstBattery.bind(this)

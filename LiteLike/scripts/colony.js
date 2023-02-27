@@ -773,6 +773,8 @@ export class TheColony extends UTILS.EventListener{
                     break;
                 case "Transport":
                     this.game.PLAYER.equipment.transport = item;
+                    // Remember to topoff the Transport when the Player buys it
+                    this.game.PLAYER.equipment.transport.topOff();
                     break;
             }
             // Notify listeners that the Player's equipment has changed

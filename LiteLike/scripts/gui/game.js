@@ -16,7 +16,7 @@ export class GameGUI{
         // Game Management
         "NEW", "SAVE", "LOAD", "QUIT",
         // Game Over Messages
-        "GAMEOVER","FUELGAMEOVER", "REPAIRGAMEOVER","HPGAMEOVER"
+        "GAMEOVER","FUELGAMEOVER", "REPAIRGAMEOVER","HPGAMEOVER", "COMBATGAMEOVER"
     )
 
     constructor(game, demos){
@@ -59,7 +59,7 @@ export class GameGUI{
         // We automatically initialize all encounters when they are started
         this.game.addEventListener("encounterstart", (event)=>event.encounter.initialize());
         // Once the encounter is done being initialized, we can load it into the GUI
-        this.game.addEventListener("encounterinitialized", (event)=>ENCOUNTERSGUI.updateSequenceGUI(event.encounter));
+        this.game.addEventListener("encounterinitialized", this.establishEncounter.bind(this));
         // Need to update the UI when there is no Encounter to display
         this.game.addEventListener("encountersequenceremoved", (event)=>ENCOUNTERSGUI.updateSequenceGUI(null));
         // Some sequences automatically call cycleEncounter which defaults to autoRemove=false
@@ -117,6 +117,7 @@ export class GameGUI{
         // If he's still alive, we don't need to do anything
         if(this.game.PLAYER.statistics.currentHP) return;
 
+
         // Otherwise we need to determine the situation
         // DEVNOTE- As more HP-Related Game Over situations arise, we'll handle them here
 
@@ -124,8 +125,26 @@ export class GameGUI{
         // This can only mean that he took damage from from lack of Repair Bots
         if(!this.game.MAP.mapLock) return this.gameOver(this.translate(this.STRINGS.REPAIRGAMEOVER));
 
+        let currentEncounter = this.game.ENCOUNTER;
+
+        // Player died during an Encounter
+        if(currentEncounter){
+            currentEncounter = currentEncounter.get();
+            // Player died in Combat
+            if(currentEncounter.type.description == "COMBAT") return this.gameOver(this.translate(this.STRINGS.COMBATGAMEOVER));
+        }
+
         // This is a default Game Over message
         this.gameOver(this.translate(this.STRINGS.HPGAMEOVER));
+    }
+
+    /**
+     * Updates the GUI for the given Encounter and sets up additional listeners if necessary
+     * @param {GameEvent} event - The Game's encounterInitialized event
+     */
+    establishEncounter(event){
+        // Update the GUI appropriately
+        ENCOUNTERSGUI.updateSequenceGUI(event.encounter)
     }
 
     exitToMainMenu(){

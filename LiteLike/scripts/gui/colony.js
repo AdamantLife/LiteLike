@@ -420,13 +420,16 @@ export class TheColonyGUI{
         // Make sure to remover EventListener
         this.colony.removeEventListener("unlockadded", this.tempListeners.map);
         let home = this.homecontent;
-        let transport = this.game.PLAYER.transport;
+
+        let player = this.game.PLAYER;
+
+        let transport = player.transport;
         let transportstrings = getStrings(this.game.STRINGS, transport);
         home.insertAdjacentHTML('beforeend', `<div id="travelPage">
         <button id="depart">Depart</button>
 <fieldset id="transport"><legend title="${transportstrings.flavor}">${transportstrings.name}</legend>
 <div><b>${this.translate(STRINGS.FUEL)}</b>:&nbsp;<span data-fuel>${transport.maxReactorPower}</span></div>
-<div><b>${this.translate(STRINGS.CAPACITY)}</b>:&nbsp;<span data-carry>${this.game.PLAYER.weight}</span>/<span data-capacity>${transport.capacity}</span></div>
+<div><b>${this.translate(STRINGS.CAPACITY)}</b>:&nbsp;<span data-carry>${player.weight}</span>/<span data-capacity>${transport.capacity}</span></div>
 <fieldset data-cargo>
     <legend>${this.translate(STRINGS.CARGO)}</legend>
     <fieldset data-weapons><legend>${this.game.UI.translate(this.game.UI.STRINGS.WEAPONS)}</legend><div></div></fieldset>
@@ -460,15 +463,15 @@ export class TheColonyGUI{
         travelPage.addEventListener("drop", this.dropInventory.bind(this));
         
         // Make sure to update transport title when the Player's transport changes 
-        this.game.PLAYER.addEventListener("equipmentchange", this.updateMapTransport.bind(this));
+        player.addEventListener("equipmentchange", this.updateMapTransport.bind(this));
         // Update carry weight when the stuff the Player is carrying changes
-        this.game.PLAYER.addEventListener("inventorychange", this.updateMapWeight.bind(this));
+        player.addEventListener("inventorychange", this.updateMapWeight.bind(this));
         // Update loadout and inventory when that changes
-        this.game.PLAYER.addEventListener("weaponadded", this.updatePlayerInventory.bind(this));
-        this.game.PLAYER.addEventListener("weaponremoved", this.updatePlayerInventory.bind(this));
-        this.game.PLAYER.addEventListener("itemadded", this.updatePlayerInventory.bind(this));
-        this.game.PLAYER.addEventListener("itemremoved", this.updatePlayerInventory.bind(this));
-        this.game.PLAYER.addEventListener("resourceschange", this.updateMechResources.bind(this));
+        player.addEventListener("weaponadded", this.updatePlayerInventory.bind(this));
+        player.addEventListener("weaponremoved", this.updatePlayerInventory.bind(this));
+        player.addEventListener("itemadded", this.updatePlayerInventory.bind(this));
+        player.addEventListener("itemremoved", this.updatePlayerInventory.bind(this));
+        player.addEventListener("resourceschange", this.updateMechResources.bind(this));
 
         // Toggles for manipulating inventory quantities
         travelPage.querySelector("tbody.loadout.items").addEventListener("click", this.togglePlayerQuantity.bind(this));
@@ -477,6 +480,42 @@ export class TheColonyGUI{
         // Update toggle arrows when colony inventory changes
         this.colony.addEventListener("itemsmodified", this.updateMechAvailability.bind(this));
         this.colony.addEventListener("resourcesmodified", this.updateMechAvailability.bind(this));
+
+
+        // Setup all equipment
+
+        // Update GUI for Player's loadout
+        // Note- this.updatePlayerInventory needs to know the loadout slot to update,
+        //      and if the index is outside the loadout, it will update the Transport
+        //      instead, which is why we're using loadout+1
+        for(let index = 0; index < player.weapons.loadout+1; index++){
+            let weapon = player.weapons[index];
+            // If the slot is empty, continue
+            // NOTE- If this "slot" is actually weapons[weapons.loadout] then it is
+            //      garaunteed that there are no weapons in the Transport
+            if(!weapon || typeof weapon == "undefined") continue;
+            // Spoofing weaponadded event
+            // updatePlayerInventory expects eventtype to be a Symbol; we could import the Player
+            // events into this module and use the EventSymbol directly, but instead we're
+            // going to keep it simple and just spoof the object
+            this.updatePlayerInventory({eventtype:{description:"weaponadded"}, item: weapon, index});
+        }
+
+        // Same as above, but with Items
+        for(let index = 0; index < player.items.loadout+1; index++){
+            let item = player.items[index];
+            if(!item || typeof item == "undefined") continue;
+            this.updatePlayerInventory({eventtype:{description:"itemadded"}, item, index});
+        }
+
+        // Resources can be updated all at once so we'll collect them all into one object
+        let resources = {};
+        for(let resource of Object.keys(player.resources))
+            // updateMechResources ignores the quantity, so we'll just put 0
+            resources[resource] = 0;
+        
+        // And pass it off to updateMechResources
+        this.updateMechResources({resources});
     }
 
     /**
@@ -1285,7 +1324,7 @@ export class TheColonyGUI{
                 if(type == "weapon") qty = 1;
                 // Othwerise get qty from player
                 else if(type == "item") qty = this.game.PLAYER.getItem(id).quantity;
-                else if(type == "resource") qty = this.game.PLAYER.resources[id];
+                else if(type == "resource") qty = this.game.PLAYER.resources[id].quantity;
         }
 
 
@@ -1382,11 +1421,9 @@ export class TheColonyGUI{
         }
         // Resource
         else{
-            qty = player.getResource(id, true).quantity;
-            player.resources[id] = null;
-            // player.resources is a {id: qty} mapping, so convert what we have to a Resource Instance
-            item = this.game.createEquipmentInstance("Resource", id, qty);
-            player.triggerEvent("resourceschange", {resources:{[id]: -qty}});
+            item = player.removeResource(id);
+            // Player is losing the quantity, so make it negative
+            player.triggerEvent("resourceschange", {resources:{[id]: -item.quantity}});
         }
 
 
@@ -1850,7 +1887,7 @@ export class TheColonyGUI{
                 player.addResource(obj);
                 
             }else {
-                player.resources[id] -= 1;
+                player.resources[id].quantity -= 1;
                 this.colony.resources[id]+=1;
             }
             // Our mod is relative to the player, so colony is the opposite of mod

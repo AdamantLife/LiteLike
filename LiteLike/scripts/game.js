@@ -155,7 +155,7 @@ export class Game extends UTILS.EventListener{
                 _class = ITEMS.Weapon;
                 base = this.ITEMS.weapons[id];
                 // Clear qty because this is a weapon
-                qty = null;
+                qty = undefined;
                 break;
         }
         // If type was invalid, just return
@@ -163,7 +163,7 @@ export class Game extends UTILS.EventListener{
         if(typeof _class == "undefined") return;
         
         // Set qty if it is available
-        if(qty){
+        if(typeof qty !== "undefined"){
             return new _class(base, qty);
         }
         // Otherwise, don't supply qty
@@ -210,7 +210,7 @@ export class Game extends UTILS.EventListener{
         // out with 3 batteries and 10 scrap
         this.COLONY.addResource(1,3);
         this.COLONY.addResource(2,10);
-        this.MAP = this.newMap(this, this.random(), true);
+        this.MAP = this.newMap(this.random(), true);
         this.MESSAGELOG = new MessageLog(this);
         this.GAMEPLAYSEQUENCE = new this._gameplayclass(this);
         this.setupGameplayUI();
@@ -262,7 +262,7 @@ export class Game extends UTILS.EventListener{
             {hp:5, currentHP: 5},
             {
                 weapons: null,
-                armor:null,
+                armor:this.ITEMS.armor[0],
                 transport:null,
                 items: null,
                 resources: null
@@ -276,7 +276,8 @@ export class Game extends UTILS.EventListener{
 
     newMap(seed, mask){
         if(!seed || typeof seed === "undefined") seed = this.random();
-        return new Map(seed, mask, this.PLAYER);
+        // NOTE- the null is the clearList (which is empty for a new map)
+        return new Map(this,seed, mask, null, this.PLAYER);
     }
 
     /**

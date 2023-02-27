@@ -1,7 +1,7 @@
 "use strict";
 
 import * as UTILS from "./utils.js";
-import {Equipment} from "./items.js";
+import {Equipment, Resource} from "./items.js";
 
 export const roles = UTILS.enumerate("PLAYER", "ENEMY", "CHARACTER", "ITEM");
 
@@ -43,7 +43,7 @@ class Entity extends UTILS.EventListener{
  */
 export class Character extends Entity{
     static EVENTTYPES = UTILS.enumerate("equipmentchange", "inventorychange",
-    "weaponschange", "weaponremoved", "weaponadded",
+    "weaponchange", "weaponremoved", "weaponadded",
     "itemschange", "itemadded", "itemremoved",
     "resourceschange",
     "hpchange", "currentHPchange");
@@ -173,10 +173,9 @@ export class Character extends Entity{
         // Also return null if we don't have any quantity of the resource and we're not supposed to returnEmpty
         if( (!r || typeof r == "undefined" || r.quantity <= 0) && !returnEmpty) return null;
 
-        // Otherwise we need to create the instance
-        // If r is null or undefined (which means that returnEmpty is true) convert it to 0
-        if(!r || typeof r == "undefined") r = 0;
-        return this.game.createEquipmentInstance("Resource", resource, r);
+        // If r is null or undefined (which means that returnEmpty is true) convert it to an Instance with quantity 0
+        if(!r || typeof r == "undefined") r = this.game.createEquipmentInstance("Resource", resource, 0);
+        return r;
     }
 
     /**
@@ -234,15 +233,18 @@ export class Character extends Entity{
      * @param {Resource} resource - The resource to be added
      */
      addResource(resource){
-        // Check if we already have it
-        let existing = this.getResource(resource.resourcetype.id);
-        // Just add it if we don't have it
-        if(!existing){
-            this.resources[resource.resourcetype.id] = 0;
-        }
-        // Otherwise, we need to update our item
-        this.resources[resource.resourcetype.id] += resource.quantity;
-        return this.resources[resource.resourcetype.id];
+        // Calling getResource with returnEmpty == true will garauntee that
+        // we have an Instance
+        let existing = this.getResource(resource.resourcetype.id, true);
+
+        // Update the item
+        existing.quantity += resource.quantity;
+
+        // Reassign it (in case getResource created the item itself)
+        this.resources[resource.resourcetype.id] = existing;
+
+        // Return the item
+        return existing;
     }
 
     /**
@@ -334,6 +336,43 @@ export class Character extends Entity{
     }
 
     /**
+     * Removes the given resource from the Player. If qty is given, then at most
+     * that much quantity will be removed.
+     * @param {Number} resource - The Resource ID to remove
+     * @param {Number} [qty] - The amount to remove
+     * @returns {Resource} - A resource Object with the amount of quantity removed from the Player
+     */
+    removeResource(resource, qty){
+        // Get the Resource Instance from the Player
+        let obj = this.getResource(resource);
+        
+        // If obj is null, then the Player doesn't have any to remove, so we can return now
+        // but we have to create the instance ourself
+        if(!obj) return this.game.createEquipmentInstance("Resource", resource, 0);
+
+        // If qty wasn't supplied, we remove all of it
+        if(typeof qty == "undefined"){
+            // Remove the Resource from the Player completely
+            delete this.resources[resource];
+
+            // We can return the obj we got earlier
+            return obj;
+        }
+
+        // Otherwise, we need to figure out whether obj actually has enough qty
+        let removeqty = Math.min(obj.quantity, qty);
+
+        // Remove that amount from the Player
+        obj.quantity -= removeqty;
+
+        // If the player no longer has any quantity, just remove the resource
+        if(!obj.quantity) delete this.resources[resource];
+
+        // Return an Object with the removed amount
+        return this.game.createEquipmentInstance("Resource", resource, removeqty);
+    }
+
+    /**
      * Applies and caps an HP change between 0 and max hp and notifies listeners
      * @param {Number} value - HP Change
      */
@@ -348,6 +387,9 @@ export class Character extends Entity{
         this.statistics.currentHP = Math.max(0,Math.min(hp, this.statistics.hp));
         // Notify listeners that HP has changed
         this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP, initialHP, rawchange: value});
+        // If this has a reference to another character, trigger the change for that character as well
+        if(typeof this.character !== "undefined") this.character.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this.character, currentHP: this.statistics.currentHP, initialHP, rawchange: value});
+        return [value, initialHP, this.statistics.currentHP];
     }
 
     /**
@@ -364,6 +406,9 @@ export class Character extends Entity{
         if(initialHP == this.statistics.currentHP) return;
         // Otherwise, notify listeners
         this.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this, currentHP: this.statistics.currentHP, initialHP, setvalue: value});
+        // If this has a reference to another character, trigger the change for that character as well
+        if(typeof this.character!== "undefined") this.character.triggerEvent(Character.EVENTTYPES.currentHPchange, {character: this.character, currentHP: this.statistics.currentHP, initialHP, setvalue: value});
+        return [value, initialHP, this.statistics.currentHP];
     }
 
     /**
@@ -439,7 +484,7 @@ export class PlayerCharacter extends Character{
     }
 
     /**
-     * Returns a new 
+     * Returns a new CombatCharacter based on the Player Character
      */
     getCombatCharacter(){
         return new CombatCharacter(this.id, this.roles, this.statistics, this.equipment, this);
@@ -491,20 +536,28 @@ export class CombatCharacter extends Character{
 
         this.statistics = statistics;
 
-        let weapons = Array.apply(null, Array(CHARAWEAPONLOADOUT)).map(function () {});
+
+        let weapons = [];
         // If there are weapons in equipment, use that value
-        if(equipment.hasOwnProperty("weapons")) weapons = equipment.weapons.getLoadout();
-        this.weapons = weapons;
+        if(equipment.hasOwnProperty("weapons")) weapons = equipment.weapons;
+        // If that happens to be an Equipment Object, we'll only take the loadout
+        if(typeof weapons.getLoadout !== "undefined") weapons = weapons.getLoadout();
+
+        // Note- We're hiding this variable as most objects interacting with
+        //      CombatCharacters only want to be passed non-empty slots
+        this._weapons = weapons;
 
         let armor = null;
         // If there is armor, set the Character's armor to that armor
         if(equipment.hasOwnProperty("armor")) armor = equipment.armor;
         this.armor = armor;
 
-        let items = Array.apply(null, Array(CHARAITEMLOADOUT)).map(function () {});
+        let items = [];
         // If there are items in equipment, use that value
-        if(equipment.hasOwnProperty("items")) items = equipment.items.getLoadout();
-        this.items = items;
+        if(equipment.hasOwnProperty("items")) items = equipment.items;
+        // If that happens to be an Equipment Object, we'll only take the loadout
+        if(typeof items.getLoadout !== "undefined") items = items.getLoadout();
+        this._items = items;
 
         let resources = {};
         // If there are items in equipment, use that value
@@ -513,18 +566,39 @@ export class CombatCharacter extends Character{
     }
 
     /**
+     * Return a list of non-empty weapon slots
+     */
+    get weapons(){
+        let output = [];
+        for(let weapon of this._weapons){
+            if(!weapon || typeof weapon == "undefined") continue;
+            output.push(weapon);
+        }
+        return output;
+    }
+
+    /**
+     * Return a list of non-empty item slots
+     */
+    get items(){
+        let output = [];
+        for(let item of this._items){
+            if(!item || typeof item == "undefined") continue;
+            output.push(item);
+        }
+        return output;
+    }
+
+    /**
      * Returns a random weapon
-     * @param {*} random - A random number generator (optional)
+     * @param {*} [random] - A random number generator
      * @returns {Weapon | null} - Returns a random weapon from this
      *                              Character's weapons, or null if it has none
      */
     randomWeapon(random){
-        // Only pick from available weapons
-        let weapons = this.weapons.filter(weapon=>weapon && typeof weapon !== "undefined");
         // No available weapons
-        if(!weapons.length) return null;
-        if(typeof random == "undefined") random = Math.random;
-        return UTILS.randomChoice(weapons, random);
+        if(!this.weapons.length) return null;
+        return UTILS.randomChoice(this.weapons, random);
     }
 
     /**
@@ -532,8 +606,11 @@ export class CombatCharacter extends Character{
      * @param {Number} now- Performance.now
      */
     updateWeapons(now){
-        for(let index = 0; index< this.weapons; index++){
-            let weapon = this.weapons[index];
+        // DEVNOTE- Because index (Slot) is important, we can't iterate over this.weapons normally
+        //      and have to use the private this._weapons variable instead (which may include empty slots)
+        for(let index = 0; index< this._weapons.length; index++){
+            let weapon = this._weapons[index];
+            if(!weapon || typeof weapon == "undefined") continue;
             let cooldown = weapon.cooldown.isReady;
             let warmup = weapon.warmup.isReady;
             weapon.updateTimers(now);

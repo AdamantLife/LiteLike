@@ -523,6 +523,8 @@ export class Resource extends Stackable{
         super(quantity, resourcetype.weight);
         this.resourcetype = resourcetype;
     }
+
+    get type(){ return this.resourcetype; }
     
     /**
      * Returns a new copy of the Resource. If qty is provided, the copy will have

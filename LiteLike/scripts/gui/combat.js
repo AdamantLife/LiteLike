@@ -249,7 +249,6 @@ export class CombatGui{
         this.combat.addEventListener("useweapon", this.animateAttack.bind(this));
         playerBox.addEventListener("animationend", clearAnimation);
         enemyBox.addEventListener("animationend", clearAnimation);
-
         
 
         // Remove Hidden class
@@ -292,8 +291,14 @@ export class CombatGui{
         ]){
             this.combat.player.removeEventListener(event, listener);
         }
-        // Call onexit (defaults to cycleEncounter)
+
+        // Make sure we're still the current Encounter
+        // If we aren't we shouldn't interfer with anyone else
+        if(this.game.ENCOUNTER.get().instance !== this.combat) return;
+        
+        // Otherwise, the default onexit is to cycle
         let onexit = this.game.cycleEncounter;
+        // Check for override
         if(this.encounteroptions.onexit && typeof this.encounteroptions.onexit !== "undefined") onexit = this.encounteroptions.onexit;
         onexit();
     }
@@ -342,7 +347,6 @@ export class CombatGui{
      * @param {WeaponEvent | ItemEvent} event - The weapon event for the weapon
      */
     updateInput(event){
-
         // We'll ignore character.weaponchange-> warmup (ready flag set) because
         // we're more interested in when Combat clears the warmup ready flag
         if(event.eventtype == CHARACTER.Character.EVENTTYPES.weaponchange && event.item.constructor.name == "Weapon" && event.timer == "warmup") return;
@@ -392,7 +396,8 @@ export class CombatGui{
                 object = event.item;
                 // Subtype is always "warmup" atm
                 subtype = "warmup";            
-        }    
+        }
+
         // We are currently not displaying enemy weapon/item use
         if(character == this.combat.enemy) return;
 
@@ -405,6 +410,8 @@ export class CombatGui{
 
         // Find out what the object's index is
         let index = loadout.indexOf(object);
+
+        
 
         // Figure out which character we're dealing with
         let charactername = character == this.combat.player ? "player" : "enemy";

@@ -31,14 +31,21 @@
                 "resources":[]
             }
         ],
-        "tiers":[
-            {
-                "combatants":[
-
+        "tiers": {
+            "combatants":[
+                [0],
+                [1],
+                [2]
+            ],
+            "rewards":[
+                [
+                    {"type":"Resource", "id": 0, "qty":[1,5] },
+                    {"type":"Resource", "id": 1, "qty":[1,5] },
+                    {"type":"Resource", "id": 2, "qty":[1,5] },
+                    {"type":"Item", "id": 0, "qty":1}
                 ],
-                "rewards":[
-                    
-                ]
-            }
-        ]
+                [],
+                []
+            ]
+        }
 }

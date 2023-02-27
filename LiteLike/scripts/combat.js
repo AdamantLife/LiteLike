@@ -101,9 +101,13 @@ export class Combat extends UTILS.EventListener{
         this.triggerEvent(Combat.EVENTTYPES.startloop);
 
         // Player has lost, so end combat
-        // We added the lockout here because we were somehow triggering multiple
-        // resolveCombats
-        if(this.victor == this.enemy && !this.lockout) return this.playerKO();
+        if(this.victor == this.enemy){
+            // We added the lockout here because we were somehow triggering multiple
+            // resolveCombats
+            if(!this.lockout) return this.playerKO();
+            // Returning should prevent combatLoop from being repeated
+            return;
+        }
 
         // Player has won and lockout time is over
         if(this.victor == this.player & this.lockout <= UTILS.now()) return this.resolveCombat();
@@ -226,8 +230,13 @@ export class Combat extends UTILS.EventListener{
         }
 
         // Weapon is fireable, so deal damage
+
+        // Get armor value
+        let armor = 0;
+        if(action.opponent.armor && typeof action.opponent.armor !== "undefined") armor = action.opponent.armor.value;
+
         // Damage right now is weapondamage - armor, minimum of 1 damage
-        let damage = Math.max(weapon.weapontype.damage - action.opponent.armor.value, 1);
+        let damage = Math.max(weapon.weapontype.damage - armor, 1);
 
         // let listeners know the weapon is about to deal damage
         // As with, triggerEvent in theory we could allow the listeners to modify combat
@@ -300,7 +309,6 @@ export class Combat extends UTILS.EventListener{
      *  so we needed to set the lockout to keep that from happening
      */
     playerKO(){
-        
         if(this.lockout) return;
         this.lockout = true;
         this.resolveCombat();

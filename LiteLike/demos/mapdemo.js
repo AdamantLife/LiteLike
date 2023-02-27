@@ -284,7 +284,7 @@ export function mapDemo(){
     GAME.MAP.addEventListener("enterunexplored", portEvent);
 
     // Entering a "Dungeon"
-    GAME.MAP.addEventListener("enterdungeon", dungeonStationEvent);
+    GAME.MAP.addEventListener("enterplanet", dungeonStationEvent);
     // Entering a Station
     GAME.MAP.addEventListener("enterstation", dungeonStationEvent);
 

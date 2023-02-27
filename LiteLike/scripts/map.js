@@ -35,7 +35,7 @@ const STATIONSYMBOL = "$";
 const PLANETSYMBOL = "&";
 
 // An empty Cell
-const EMPTY = ".";
+export const EMPTY = ".";
 
 export const directions = UTILS.enumerate("NORTH","EAST","SOUTH","WEST");
 
@@ -65,7 +65,7 @@ export class Map extends UTILS.EventListener{
         "movestart", "move", "moveend",
         "enterunexplored", "leaveunexplored",
         "enterport", "leaveport",
-        "enterdungeon", "leavedungeon",
+        "enterplanet", "leaveplanet",
         "enterstation", "leavestation",
         "entercolony", "leavecolony",
         "mapchange"
@@ -77,9 +77,10 @@ export class Map extends UTILS.EventListener{
      * @param {String | null} seed - Random Seed for the map (if not provided, one will be created
      * @param {Number[][] | true} mask - An array of Strings representing the revealed map. If true,
      *      generate a new mask which is filled with 0's
+     * @param {Number[]} clearList - An array of structure ids  which have already been cleared by the Player
      * @param {Character} player - The Player Character
      */
-    constructor(game, seed, mask, player){
+    constructor(game, seed, mask, clearList, player){
         super(Map.EVENTTYPES);
         this.game = game;
         this.seed = seed;
@@ -94,7 +95,11 @@ export class Map extends UTILS.EventListener{
             }
         }
         this.mask = mask;
+        if(!clearList || typeof clearList == "undefined") clearList = [];
+        this.clearList = clearList;
         this.map = null;
+        // this.structures is used to get Structure IDs
+        this.structures = {};
         this.#createMap();
         this.player = player;
         this.playerLocation = null;
@@ -175,6 +180,9 @@ export class Map extends UTILS.EventListener{
         // NOTE- See note above about hardcoding
         let HOMESECTOR = 24;
 
+        // Track the structure ID in order to index it against the clearList
+        let structureId = 0;
+
         // Iterate over all the structures
         while(remaining_structures.length){
             // Get our sector first
@@ -193,7 +201,7 @@ export class Map extends UTILS.EventListener{
             }
             // Pull the first structure out
             // NOTE- Because we're randomly selecting a Sector to go with it, it doesn't
-            //      matter that we're pulling Structures in order (i.e.- Dungeon, Dungeon, etc..)
+            //      matter that we're pulling Structures in order (i.e.- Planet, Planet, etc..)
             let structure = remaining_structures.shift();
 
             // Get X and Y major offsets of the Sector (Top-left Cell Coordinate)
@@ -207,8 +215,22 @@ export class Map extends UTILS.EventListener{
             let x = X + Math.floor(random()*3);
             let y = Y + Math.floor(random()*3);
 
+            // Log the Structure's Location
+            // NOTE- we're doing this so we can save the structure type
+            //      before we check if it's been cleared
+            this.structures[[x,y]] = {id: structureId, structure};
+
+            // Check if structure is  on the clearList
+            if(this.clearList.indexOf(structureId) >= 0){
+                // Replace the structure the structure with a PORTSYMBOL
+                structure = PORTSYMBOL;
+            }
+
             // Place structure
             this.map[y][x] = structure;
+            
+            // Increment the structureID
+            structureId+=1;
         }
 
         // Now that we're done generating the map, we'll join the rows up into strings
@@ -231,11 +253,25 @@ export class Map extends UTILS.EventListener{
     }
 
     /**
-     * Returns the manhattan distance between HOMECOOD and playerLocation
+     * Returns the manhattan distance between HOMECOOD and the given location
+     * @param {Number[]} [location]- the Location to use; defaults to this.playerLocation
      * @returns {Number} - The manhattan distance from Home to the Player's Coord
      */
-    distanceFromHome(){
-        return Math.abs(this.playerLocation[0] - HOMECOORD[0])+ Math.abs(this.playerLocation[1] - HOMECOORD[1]);
+    distanceFromHome(location){
+        if(!location || typeof location == "undefined") location = this.playerLocation
+        return Math.abs(location[0] - HOMECOORD[0])+ Math.abs(location[1] - HOMECOORD[1]);
+    }
+
+    /**
+     * Determines the Encounter Tier of the location based on its distance from The Colony
+     * @param {*} location 
+     */
+    getLocationTier(location){
+        // Use the distance from The Colony to determine the Tier
+        // NOTE- Tiers are 1-indexed, so we need to use Math.ceil
+        // DEVNOTE- Using this method evenly spaces the tiers: we may want to to revist this if
+        //      it seems like the Player needs to have a wider "easy" range
+        return Math.ceil(this.distanceFromHome(location) / this.game.ENCOUNTERS.tiers.length);
     }
 
     /**
@@ -348,7 +384,7 @@ export class Map extends UTILS.EventListener{
         if(0 > destination[0] || destination[0] >= MAPSIZE ||
             0 > destination[1] || destination[1] >= MAPSIZE) return [direction, false];
 
-        // Check if the player is moving into or out of a port, colony, or dungeon
+        // Check if the player is moving into or out of a port, colony, or planet
         let fromSymbol = this.getSymbolAtLocation(this.playerLocation), toSymbol = this.getSymbolAtLocation(destination);
 
         let eventtype;
@@ -367,7 +403,7 @@ export class Map extends UTILS.EventListener{
                 eventtype = Map.EVENTTYPES.leavestation;
                 break;
             case PLANETSYMBOL:
-                eventtype = Map.EVENTTYPES.leavedungeon;
+                eventtype = Map.EVENTTYPES.leaveplanet;
                 break;
         }
         if(eventtype) this.triggerEvent(eventtype, {direction, playerLocation: this.playerLocation, destination});
@@ -388,7 +424,7 @@ export class Map extends UTILS.EventListener{
                 eventtype = Map.EVENTTYPES.enterstation;
                 break;
             case PLANETSYMBOL:
-                eventtype = Map.EVENTTYPES.enterdungeon;
+                eventtype = Map.EVENTTYPES.enterplanet;
                 break;
         }
         
@@ -523,6 +559,11 @@ export class Map extends UTILS.EventListener{
         // Note that replaceSymbolAtLocation modifies the object inplace, so our map object
         // is automatically "overwritten"
         this.replaceSymbolAtLocation(this.map, location, PORTSYMBOL);
+        
+        // Add the structure to our clearList by getting its
+        // id from this.structures
+        this.clearList.push(this.structures[location].id);
+
         // Trigger event to let listeners know that there has been a change to our Map
         this.triggerEvent(Map.EVENTTYPES.mapchange, {map: this.map, location});
     }
